@@ -1,0 +1,171 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Life Tracker Design System - Inspired by productivity apps */
+
+@layer base {
+  :root {
+    --background: 250 250 250;
+    --foreground: 51 65% 7%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 51 65% 7%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 51 65% 7%;
+
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 210 40% 98%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 98%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 98%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221 83% 53%;
+
+    --radius: 0.75rem;
+
+    /* Life Tracker Custom Colors - Soft Modern Theme */
+    --gradient-primary: linear-gradient(135deg, hsl(221 83% 53%), hsl(262 83% 58%));
+    --gradient-secondary: linear-gradient(135deg, hsl(250 250 250), hsl(241 100% 99%));
+    --gradient-header: linear-gradient(135deg, hsl(221 83% 53%), hsl(251 91% 95%));
+    
+    /* Category Colors */
+    --health: 142 76% 36%;
+    --health-light: 142 76% 85%;
+    --strength: 32 95% 44%;
+    --strength-light: 32 95% 85%;
+    --intelligence: 217 91% 60%;
+    --intelligence-light: 217 91% 85%;
+    --confidence: 0 84% 60%;
+    --confidence-light: 0 84% 85%;
+    --status: 262 83% 58%;
+    --status-light: 262 83% 85%;
+    --work: 45 93% 47%;
+    --work-light: 45 93% 85%;
+    --spirit: 280 100% 70%;
+    --spirit-light: 280 100% 85%;
+
+    /* Chart Colors */
+    --chart-1: 142 76% 36%;
+    --chart-2: 32 95% 44%;
+    --chart-3: 217 91% 60%;
+    --chart-4: 0 84% 60%;
+    --chart-5: 262 83% 58%;
+
+    /* Enhanced Shadows */
+    --shadow-soft: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+    --shadow-medium: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
+    --shadow-large: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
+    --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 1px 2px 0 hsl(0 0% 0% / 0.06);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 221 83% 53%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Force white backgrounds for form inputs - Override yellow tint issue */
+input, textarea, select, [data-radix-select-trigger] {
+  background-color: white !important;
+}
+
+/* Override bg-background class */
+.bg-background {
+  background-color: white !important;
+}
+
+/* Additional specificity for shadcn components */
+[data-radix-select-trigger] {
+  background-color: white !important;
+}
+
+/* Ensure all form elements have white backgrounds */
+input[type="text"], 
+input[type="email"], 
+input[type="password"], 
+input[type="number"], 
+input[type="date"], 
+input[type="time"], 
+input[type="search"], 
+input[type="tel"], 
+input[type="url"],
+textarea,
+select {
+  background-color: white !important;
+}
