@@ -1,73 +1,51 @@
-# Welcome to your Lovable project
+## Pulseboard Life Tracker
 
-## Project info
+Live app: https://pulseboard-life-tracker.netlify.app/
 
-**URL**: https://lovable.dev/projects/c1307cec-58f0-4e0d-b1ec-23c96af86d9b
+### Overview
+Pulseboard is a life tracking app (tasks, finances, investments) built with React + TypeScript. The frontend is public, while the backend lives in a separate private repository.
 
-## How can I edit this code?
+### Tech Stack
+- Frontend: React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, React Router, React Hook Form + Zod, @tanstack/react-query, date-fns
+- Backend (separate, private): AWS Lambda, API Gateway, DynamoDB, Cognito, AWS CDK (TypeScript)
+- Hosting: Netlify (frontend)
 
-There are several ways of editing your application.
+### Repositories
+- Frontend (this repo): Public
+- Backend (private): https://github.com/LuckyGit101/pulseboard-backend.git
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/c1307cec-58f0-4e0d-b1ec-23c96af86d9b) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### Getting Started (Frontend)
+Prerequisites: Node.js 18+
+```bash
+npm install
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Environment Variables (Frontend)
+Create `.env.local` in the frontend with:
+```env
+VITE_API_URL=https://your-api-gateway-url.execute-api.us-east-1.amazonaws.com/dev
+VITE_USER_POOL_ID=us-east-1_XXXX
+VITE_CLIENT_ID=xxxxxxxx
+VITE_REGION=us-east-1
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Deployment (Frontend)
+- Hosted on Netlify at https://pulseboard-life-tracker.netlify.app/
+- `netlify.toml` handles build (`npm run build`), headers, and SPA redirects.
 
-**Use GitHub Codespaces**
+### Authentication (Current)
+- Mocked on the frontend via localStorage until Cognito integration is wired through the API service layer.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Backend (Private Repo)
+- AWS Serverless with single-table DynamoDB, Cognito auth, and API Gateway.
+- Deploy from the private repo. Frontend uses env vars to point to API + Cognito.
 
-## What technologies are used for this project?
+### Scripts
+- `npm run dev` – start local dev server
+- `npm run build` – build for production
+- `npm run preview` – preview production build
+- `npm run lint` – lint code
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/c1307cec-58f0-4e0d-b1ec-23c96af86d9b) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+### Notes
+- The `backend/` directory was moved to a private repo and is ignored in this repo via `.gitignore`.
