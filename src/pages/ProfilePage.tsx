@@ -9,19 +9,19 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { User, Mail, Calendar, Settings, Globe, Download, Shield, LogOut, ArrowRight, Bell, Moon } from 'lucide-react';
 import { TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
-
-import { userData } from '@/data/mockData';
-
-// Use imported user data - Cache refresh fix
-const mockUser = userData;
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const ProfilePage = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  
   const [userInfo, setUserInfo] = useState({
-    name: mockUser.name,
-    email: mockUser.email,
-    age: '24',
-    gender: 'Male',
-    timezone: ''
+    name: user?.name || '',
+    email: user?.email || '',
+    age: user?.age?.toString() || '24',
+    gender: user?.gender || 'Male',
+    timezone: user?.timezone || ''
   });
 
   const [preferences, setPreferences] = useState({
@@ -39,16 +39,17 @@ const ProfilePage = () => {
   };
 
   const handleLogout = () => {
-    console.log('Logout');
+    logout();
+    navigate('/login');
   };
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
-  const memberSince = mockUser.memberSince;
+  const memberSince = user?.memberSince || 'January 2024';
 
-  const completionRate = Math.round((mockUser.completedTasks / mockUser.totalTasks) * 100);
+  const completionRate = user ? Math.round((user.completedTasks / user.totalTasks) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-white bg-gradient-to-b from-[#f5f6fa] to-[#e9eafc] p-6 lg:p-10">
@@ -65,18 +66,18 @@ const ProfilePage = () => {
         <Card className={LAYOUT.standardCard}>
           <div className="flex flex-col md:flex-row items-center gap-6">
             <Avatar className="w-24 h-24">
-              <AvatarImage src={mockUser.avatar} />
+              <AvatarImage src={user?.avatar} />
               <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                {getInitials(mockUser.name)}
+                {getInitials(user?.name || '')}
               </AvatarFallback>
             </Avatar>
             
             <div className="text-center md:text-left flex-1">
-              <h1 className="text-3xl font-bold mb-2 text-foreground">{mockUser.name}</h1>
+              <h1 className="text-3xl font-bold mb-2 text-foreground">{user?.name}</h1>
               <div className="flex flex-wrap items-center gap-3 text-muted-foreground mb-4">
                 <div className="flex items-center gap-1">
                   <Mail className="h-4 w-4" />
-                  <span>{mockUser.email}</span>
+                  <span>{user?.email}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
@@ -85,8 +86,8 @@ const ProfilePage = () => {
               </div>
               
               <div className="flex flex-wrap gap-2 mb-4">
-                <Badge className="bg-status text-white">Level {mockUser.level}</Badge>
-                <Badge variant="outline">{mockUser.totalTasks} Total Tasks</Badge>
+                <Badge className="bg-status text-white">Level {user?.level}</Badge>
+                <Badge variant="outline">{user?.totalTasks} Total Tasks</Badge>
                 <Badge variant="outline" className="text-health">{completionRate}% Completion Rate</Badge>
               </div>
             </div>
@@ -104,17 +105,17 @@ const ProfilePage = () => {
         {/* Stats Cards */}
         <div className="grid md:grid-cols-3 gap-4">
           <Card className="p-6 text-center bg-white shadow-card border border-border">
-            <div className="text-3xl font-bold text-primary mb-2">{mockUser.totalTasks}</div>
+            <div className="text-3xl font-bold text-primary mb-2">{user?.totalTasks || 0}</div>
             <div className="text-muted-foreground">Total Tasks</div>
           </Card>
           
           <Card className="p-6 text-center bg-white shadow-card border border-border">
-            <div className="text-3xl font-bold text-health mb-2">{mockUser.completedTasks}</div>
+            <div className="text-3xl font-bold text-health mb-2">{user?.completedTasks || 0}</div>
             <div className="text-muted-foreground">Completed Tasks</div>
           </Card>
           
           <Card className="p-6 text-center bg-white shadow-card border border-border">
-            <div className="text-3xl font-bold text-strength mb-2">{mockUser.level}</div>
+            <div className="text-3xl font-bold text-strength mb-2">{user?.level || 1}</div>
             <div className="text-muted-foreground">Current Level</div>
           </Card>
         </div>
@@ -142,7 +143,7 @@ const ProfilePage = () => {
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
-                  value={mockUser.email}
+                  value={user?.email || ''}
                   disabled
                   className="bg-muted"
                 />
