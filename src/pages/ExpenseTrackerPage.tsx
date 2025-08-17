@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { DollarSign, TrendingDown, TrendingUp, Plus, Calendar, Home, Car, Heart, Zap, User, Utensils, PiggyBank, Clock } from 'lucide-react';
 import { mockExpenses, mockIncome, trendData } from '@/data/mockData';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
+import { apiClient, Expense } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Debug logging to check data
 console.log('ExpenseTrackerPage - expenseData:', mockExpenses);
@@ -37,7 +39,10 @@ const mockExpenseBreakdown = [
 const categories = Object.keys(EXPENSE_CATEGORIES);
 
 const ExpenseTrackerPage = () => {
+  const { isAuthenticated } = useAuth();
   const [entryType, setEntryType] = useState<'expense' | 'income'>('expense');
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     amount: '',
@@ -52,6 +57,28 @@ const ExpenseTrackerPage = () => {
     amountMin: '',
     amountMax: ''
   });
+
+  // Load real expenses when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadExpenses();
+    }
+  }, [isAuthenticated]);
+
+  const loadExpenses = async () => {
+    setLoading(true);
+    try {
+      console.log('Loading expenses from API...');
+      const apiExpenses = await apiClient.getExpenses();
+      console.log('Loaded expenses:', apiExpenses);
+      setExpenses(apiExpenses);
+    } catch (error) {
+      console.error('Error loading expenses:', error);
+      // Keep existing expenses or use empty array
+    } finally {
+      setLoading(false);
+    }
+  };
   const [recurringExpenses, setRecurringExpenses] = useState([
     {
       id: '1',
@@ -191,31 +218,7 @@ const ExpenseTrackerPage = () => {
   const investmentsData = monthlyData.mainCategories.find(cat => cat.name === 'Investments');
   const expensesData = monthlyData.mainCategories.find(cat => cat.name === 'Expenses');
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Submit entry:', formData, entryType);
-    
-    // If this is a recurring expense, add it to the recurring expenses list
-    if (formData.isRecurring && entryType === 'expense') {
-      const newRecurringExpense = {
-        id: Date.now().toString(),
-        name: formData.name,
-        category: formData.category,
-        amount: '',
-        date: new Date().toISOString().split('T')[0]
-      };
-      setRecurringExpenses(prev => [...prev, newRecurringExpense]);
-    }
-    
-    // Reset form
-    setFormData({
-      name: '',
-      amount: '',
-      category: '',
-      date: new Date().toISOString().split('T')[0],
-      isRecurring: false
-    });
-  };
+
 
   const handleRecurringExpenseSubmit = (id: string, amount: string) => {
     if (amount && parseFloat(amount) > 0) {
@@ -259,11 +262,13 @@ const ExpenseTrackerPage = () => {
     }, 100);
   };
 
-  // Filter data based on current filters
-  const currentData = entryType === 'expense' ? (mockExpenses || fallbackExpenseData) : (mockIncome || fallbackIncomeData);
-  console.log('ExpenseTrackerPage - currentData:', currentData, 'entryType:', entryType);
-  console.log('ExpenseTrackerPage - currentData type:', typeof currentData, 'isArray:', Array.isArray(currentData));
-  console.log('ExpenseTrackerPage - mockExpenses:', mockExpenses, 'mockIncome:', mockIncome);
+  // Filter data based on current filters - use real expenses when authenticated, fallback to mock
+  const currentData = entryType === 'expense' 
+    ? (isAuthenticated && expenses.length > 0 ? expenses : (mockExpenses || fallbackExpenseData))
+    : (mockIncome || fallbackIncomeData); // For now, income still uses mock data
+  
+  console.log('ExpenseTrackerPage - currentData:', currentData, 'entryType:', entryType, 'isAuthenticated:', isAuthenticated);
+  console.log('ExpenseTrackerPage - expenses from API:', expenses);
   
   // Ensure currentData is always an array
   const dataArray = Array.isArray(currentData) ? currentData : (currentData ? Object.values(currentData) : []);
@@ -280,6 +285,58 @@ const ExpenseTrackerPage = () => {
   });
 
   const hasActiveFilters = filters.category !== 'all' || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax;
+
+  // Handle form submission for adding new expenses
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name || !formData.amount || !formData.category) {
+      console.log('Please fill in all required fields');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      console.log('Mock save expense:', formData);
+      // Reset form for mock mode
+      setFormData({
+        name: '',
+        amount: '',
+        category: '',
+        date: new Date().toISOString().split('T')[0],
+        isRecurring: false
+      });
+      return;
+    }
+
+    try {
+      console.log('Saving expense:', formData);
+      
+      await apiClient.createExpense({
+        name: formData.name,
+        amount: parseFloat(formData.amount),
+        category: formData.category,
+        date: formData.date,
+        isRecurring: formData.isRecurring,
+        notes: undefined
+      });
+
+      // Reset form on success
+      setFormData({
+        name: '',
+        amount: '',
+        category: '',
+        date: new Date().toISOString().split('T')[0],
+        isRecurring: false
+      });
+
+      // Reload expenses
+      await loadExpenses();
+      
+      console.log('Expense saved successfully');
+    } catch (error) {
+      console.error('Error saving expense:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white bg-gradient-to-b from-[#f5f6fa] to-[#e9eafc] p-6 lg:p-10">

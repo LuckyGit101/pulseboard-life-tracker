@@ -62,12 +62,15 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim()) return;
+    
+    // Ensure at least one category is selected (backend requirement)
+    const finalCategories = formData.categories.length > 0 ? formData.categories : ['Work'];
 
     onSave({
       title: formData.title,
       description: formData.description,
       date: formData.date,
-      categories: formData.categories,
+      categories: finalCategories,
       duration: formData.duration,
       repeatFrequency: formData.repeatFrequency,
       repeatCount: formData.repeatCount,
@@ -154,7 +157,8 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
         </div>
 
         <div className="space-y-3">
-          <Label>Categories</Label>
+          <Label>Categories <span className="text-red-500">*</span></Label>
+          <p className="text-xs text-gray-600">Select at least one category (defaults to "Work" if none selected)</p>
           <div className="grid grid-cols-2 gap-3">
             {categories.map((category) => (
               <div

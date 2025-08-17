@@ -178,11 +178,12 @@ const LoginPage = () => {
               )}
             </Button>
 
-            {/* Demo Credentials */}
+            {/* Test Credentials */}
             <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-800 font-medium mb-2">Demo Credentials:</p>
-              <p className="text-xs text-blue-700">Email: rahul.sharma@gmail.com</p>
-              <p className="text-xs text-blue-700">Password: password123</p>
+              <p className="text-sm text-blue-800 font-medium mb-2">Test Credentials:</p>
+              <p className="text-xs text-blue-700">Email: luckybeel101@gmail.com</p>
+              <p className="text-xs text-blue-700">Password: LuckyPass123!</p>
+              <p className="text-xs text-blue-600 mt-1">(Your test account)</p>
             </div>
           </form>
 

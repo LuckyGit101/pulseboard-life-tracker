@@ -407,9 +407,6 @@ const TaskCalendar = ({ view, selectedDate, onDateSelect, tasks }: TaskCalendarP
               return <div key={index} className="p-2" />;
             }
 
-            const dayTasks = getTasksForDate(date);
-            const completedCount = dayTasks.filter(t => t.completed).length;
-            const incompleteCount = dayTasks.length - completedCount;
             return (
               <div
                 key={index}
@@ -428,19 +425,9 @@ const TaskCalendar = ({ view, selectedDate, onDateSelect, tasks }: TaskCalendarP
                     {date.getDate()}
                   </span>
                 </div>
+                {/* Removed dots to prevent unnecessary API calls */}
                 <div className="flex justify-center gap-1">
-                  {Array.from({ length: incompleteCount }).map((_, i) => (
-                    <span
-                      key={`incomplete-${i}`}
-                      className="inline-block w-2 h-2 rounded-full bg-destructive"
-                    />
-                  ))}
-                  {Array.from({ length: completedCount }).map((_, i) => (
-                    <span
-                      key={`complete-${i}`}
-                      className="inline-block w-2 h-2 rounded-full bg-success"
-                    />
-                  ))}
+                  {/* Task indicators removed - only fetch tasks for selected date */}
                 </div>
               </div>
             );
