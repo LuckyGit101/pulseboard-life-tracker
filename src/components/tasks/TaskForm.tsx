@@ -11,7 +11,7 @@ interface Task {
   id: string;
   title: string;
   description?: string;
-  date: string;
+  date?: string; // Made optional to support tasks without dates
   categories: string[];
   duration: number;
   repeatFrequency?: 'none' | 'daily' | 'weekly' | 'monthly';
@@ -23,7 +23,7 @@ interface Task {
 interface TaskFormProps {
   task?: Task;
   defaultDate?: string;
-  onSave: (task: Omit<Task, 'id'>) => void;
+  onSave: (task: Omit<Task, 'id'>, editMode?: 'single' | 'series') => void;
   onCancel: () => void;
 }
 
@@ -34,13 +34,15 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    hasDate: true, // New flag to control whether task has a date
     date: defaultDate || new Date().toISOString().split('T')[0],
     categories: [] as string[],
     duration: 30,
     repeatFrequency: 'none' as 'none' | 'daily' | 'weekly' | 'monthly',
     repeatCount: 1,
     points: {} as { [category: string]: number },
-    completed: false
+    completed: false,
+    editMode: 'single' as 'single' | 'series' // Edit mode for recurring tasks
   });
 
   useEffect(() => {
@@ -48,16 +50,18 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
       setFormData({
         title: task.title,
         description: task.description || '',
-        date: task.date,
+        hasDate: !!task.date, // Set hasDate based on whether task has a date
+        date: task.date || defaultDate || new Date().toISOString().split('T')[0],
         categories: task.categories,
         duration: task.duration,
         repeatFrequency: task.repeatFrequency || 'none',
         repeatCount: task.repeatCount || 1,
         points: task.points || {},
-        completed: task.completed
+        completed: task.completed,
+        editMode: 'single' // Default to single occurrence editing
       });
     }
-  }, [task]);
+  }, [task, defaultDate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,14 +73,14 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
     onSave({
       title: formData.title,
       description: formData.description,
-      date: formData.date,
+      date: formData.hasDate ? formData.date : undefined, // Only include date if hasDate is true
       categories: finalCategories,
       duration: formData.duration,
       repeatFrequency: formData.repeatFrequency,
       repeatCount: formData.repeatCount,
       points: formData.points,
       completed: formData.completed
-    });
+    }, formData.editMode);
   };
 
   const handleCategoryToggle = (category: string) => {
@@ -146,13 +150,25 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="date">Date</Label>
-            <Input
-              id="date"
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-            />
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="hasDate"
+                checked={formData.hasDate}
+                onChange={(e) => setFormData(prev => ({ ...prev, hasDate: e.target.checked }))}
+                className="w-4 h-4 text-primary"
+              />
+              <Label htmlFor="hasDate">Has Date</Label>
+            </div>
+            
+            {formData.hasDate && (
+              <Input
+                id="date"
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+              />
+            )}
           </div>
         </div>
 
@@ -239,6 +255,48 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
               min="1"
               placeholder="1"
             />
+          </div>
+        )}
+
+        {/* Edit Mode Selection for Recurring Tasks */}
+        {task && task.repeatFrequency !== 'none' && (
+          <div className="space-y-3">
+            <Label>Edit Mode</Label>
+            <p className="text-xs text-gray-600">Choose how to apply changes to this recurring task</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div
+                className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${
+                  formData.editMode === 'single'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+                onClick={() => setFormData(prev => ({ ...prev, editMode: 'single' }))}
+              >
+                <input
+                  type="radio"
+                  checked={formData.editMode === 'single'}
+                  onChange={() => setFormData(prev => ({ ...prev, editMode: 'single' }))}
+                  className="w-4 h-4 text-primary"
+                />
+                <span className="text-sm font-medium">This occurrence only</span>
+              </div>
+              <div
+                className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${
+                  formData.editMode === 'series'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+                onClick={() => setFormData(prev => ({ ...prev, editMode: 'series' }))}
+              >
+                <input
+                  type="radio"
+                  checked={formData.editMode === 'series'}
+                  onChange={() => setFormData(prev => ({ ...prev, editMode: 'series' }))}
+                  className="w-4 h-4 text-primary"
+                />
+                <span className="text-sm font-medium">All future occurrences</span>
+              </div>
+            </div>
           </div>
         )}
 

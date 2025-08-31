@@ -53,6 +53,10 @@ export interface Task {
   categories: string[];
   points: Record<string, number>;
   status: 'completed' | 'pending';
+  repeatFrequency?: 'none' | 'daily' | 'weekly' | 'monthly';
+  repeatCount?: number;
+  isRecurring?: boolean;
+  recurringId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -484,6 +488,35 @@ class ApiClient {
     const endpoint = `/recurring/${recurringId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     const response = await this.request<{ items: any[]; total: number; page: number; limit: number; hasMore: boolean }>(endpoint);
     return response.data?.items || [];
+  }
+
+  async updateRecurringInstances(recurringId: string, updates: any, filters?: any): Promise<any> {
+    const response = await this.request(`/recurring/${recurringId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ updates, filters }),
+    });
+    return response.data!;
+  }
+
+  async updateRecurringRule(recurringId: string, rule: Partial<RecurringRule>): Promise<RecurringRule> {
+    const response = await this.request(`/recurring/${recurringId}`, {
+      method: 'PUT',
+      body: JSON.stringify(rule),
+    });
+    return response.data!;
+  }
+
+  async deleteRecurringRule(recurringId: string): Promise<void> {
+    await this.request(`/recurring/${recurringId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async deleteRecurringInstances(recurringId: string, filters?: any): Promise<void> {
+    await this.request(`/recurring/${recurringId}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ filters }),
+    });
   }
 }
 

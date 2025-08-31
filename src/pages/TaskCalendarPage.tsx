@@ -627,81 +627,125 @@ const TaskCalendarPage = () => {
     try {
       console.log('Loading tasks from API...');
       
-      // Load tasks for the selected date only
-      const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
-      console.log('Loading tasks for date:', selectedDateStr);
-      
       let apiResponse;
       if (taskView === 'tasks') {
-        // For tasks view, get all tasks without date filter
-        console.log('Fetching all tasks for "Tasks" view...');
+        // For "Other Tasks" view, get all tasks without date filter
+        console.log('Fetching all tasks for "Other Tasks" view...');
         apiResponse = await apiClient.getTasks({
-          view: 'monthly'
+          view: 'tasks'
+        });
+      } else if (taskView === 'weekly') {
+        // For weekly view, get all tasks and filter by week range
+        console.log('Fetching all tasks for weekly view...');
+        apiResponse = await apiClient.getTasks({
+          view: 'weekly'
         });
       } else {
-        // For daily/weekly, get tasks for specific date
+        // For daily view, get tasks for specific date
+        const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
         console.log('Fetching tasks for date:', selectedDateStr, 'view:', taskView);
         apiResponse = await apiClient.getTasks({
           date: selectedDateStr,
-          view: taskView
+          view: 'daily'
         });
       }
-             console.log('API Response:', apiResponse);
-       console.log('API Response type:', typeof apiResponse);
-       console.log('API Response length:', apiResponse?.length);
-       console.log('API Response is array:', Array.isArray(apiResponse));
-              console.log('API Response details:', JSON.stringify(apiResponse, null, 2));
-       console.log('API Response first task date:', apiResponse[0]?.date);
-       console.log('API Response first task userId:', apiResponse[0]?.userId);
-       
-       // Check if we have real tasks from API
-       if (apiResponse && apiResponse.length > 0) {
+      
+      console.log('API Response:', apiResponse);
+      console.log('API Response type:', typeof apiResponse);
+      console.log('API Response length:', apiResponse?.length);
+      console.log('API Response is array:', Array.isArray(apiResponse));
+      console.log('API Response details:', JSON.stringify(apiResponse, null, 2));
+      console.log('API Response first task date:', apiResponse[0]?.date);
+      console.log('API Response first task userId:', apiResponse[0]?.userId);
+      
+      // Check if we have real tasks from API
+      if (apiResponse && apiResponse.length > 0) {
         // Transform API tasks to match UI structure
         const transformedTasks = apiResponse.map(transformApiTask);
         console.log('Using real tasks:', transformedTasks.length, 'tasks');
         
-        // Filter based on view
+        // Apply view-specific filtering
+        let filteredTasks;
         if (taskView === 'tasks') {
-          // For tasks view, only show tasks without dates
-          const tasksWithoutDate = transformedTasks.filter(task => !task.date);
-          console.log('Tasks without dates:', tasksWithoutDate.length, 'tasks');
-          setTasks(tasksWithoutDate);
+          // For "Other Tasks" view, only show tasks without dates
+          filteredTasks = transformedTasks.filter(task => !task.date);
+          console.log('Tasks without dates:', filteredTasks.length, 'tasks');
+        } else if (taskView === 'weekly') {
+          // For weekly view, filter tasks within the week (Sunday to Saturday)
+          const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 }); // Sunday = 0
+          const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 }); // Saturday = 6
+          
+          filteredTasks = transformedTasks.filter(task => {
+            if (!task.date) return false; // Exclude tasks without dates in weekly view
+            const taskDate = new Date(task.date);
+            return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
+          });
+          console.log('Weekly tasks:', filteredTasks.length, 'tasks for week', format(weekStart, 'yyyy-MM-dd'), 'to', format(weekEnd, 'yyyy-MM-dd'));
         } else {
-          // For daily/weekly, show all tasks (already filtered by date in API)
-          setTasks(transformedTasks);
+          // For daily view, show all tasks (already filtered by date in API)
+          filteredTasks = transformedTasks;
         }
+        
+        setTasks(filteredTasks);
       } else {
         // No real tasks, use mock data
+        let mockFilteredTasks;
         if (taskView === 'tasks') {
-          // For tasks view, show all tasks without dates
+          // For "Other Tasks" view, show all tasks without dates
           console.log('No real tasks found, using mock data for tasks without dates');
-          const mockTasksWithoutDate = mockTasks.filter(task => !task.date);
-          console.log('Mock tasks without dates:', mockTasksWithoutDate);
-          setTasks(mockTasksWithoutDate);
+          mockFilteredTasks = mockTasks.filter(task => !task.date);
+          console.log('Mock tasks without dates:', mockFilteredTasks.length, 'tasks');
+        } else if (taskView === 'weekly') {
+          // For weekly view, filter mock data by week range
+          const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 }); // Sunday = 0
+          const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 }); // Saturday = 6
+          
+          mockFilteredTasks = mockTasks.filter(task => {
+            if (!task.date) return false; // Exclude tasks without dates in weekly view
+            const taskDate = new Date(task.date);
+            return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
+          });
+          console.log('Mock weekly tasks:', mockFilteredTasks.length, 'tasks for week', format(weekStart, 'yyyy-MM-dd'), 'to', format(weekEnd, 'yyyy-MM-dd'));
         } else {
-          // For daily/weekly, use mock data for the selected date only
+          // For daily view, use mock data for the selected date only
+          const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
           console.log('No real tasks found, using mock data for date:', selectedDateStr);
-          const mockTasksForDate = mockTasks.filter(task => task.date === selectedDateStr);
-          console.log('Mock tasks for date:', selectedDateStr, ':', mockTasksForDate);
-          setTasks(mockTasksForDate);
+          mockFilteredTasks = mockTasks.filter(task => task.date === selectedDateStr);
+          console.log('Mock tasks for date:', selectedDateStr, ':', mockFilteredTasks.length, 'tasks');
         }
+        
+        setTasks(mockFilteredTasks);
       }
     } catch (error) {
       console.error('Error loading tasks:', error);
       console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
       // Fallback to mock data
+      let mockFilteredTasks;
       if (taskView === 'tasks') {
-        // For tasks view, show all tasks without dates
+        // For "Other Tasks" view, show all tasks without dates
         const mockTasksWithoutDate = mockTasks.filter(task => !task.date);
-        console.log('Fallback to mock data for tasks without dates:', mockTasksWithoutDate);
-        setTasks(mockTasksWithoutDate);
+        console.log('Fallback to mock data for tasks without dates:', mockTasksWithoutDate.length, 'tasks');
+        mockFilteredTasks = mockTasksWithoutDate;
+      } else if (taskView === 'weekly') {
+        // For weekly view, filter mock data by week range
+        const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 }); // Sunday = 0
+        const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 }); // Saturday = 6
+        
+        mockFilteredTasks = mockTasks.filter(task => {
+          if (!task.date) return false; // Exclude tasks without dates in weekly view
+          const taskDate = new Date(task.date);
+          return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
+        });
+        console.log('Fallback mock weekly tasks:', mockFilteredTasks.length, 'tasks for week', format(weekStart, 'yyyy-MM-dd'), 'to', format(weekEnd, 'yyyy-MM-dd'));
       } else {
-        // For daily/weekly, use mock data for the selected date only
+        // For daily view, use mock data for the selected date only
         const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
         const mockTasksForDate = mockTasks.filter(task => task.date === selectedDateStr);
-        console.log('Fallback to mock data for date:', selectedDateStr, ':', mockTasksForDate);
-        setTasks(mockTasksForDate);
+        console.log('Fallback to mock data for date:', selectedDateStr, ':', mockTasksForDate.length, 'tasks');
+        mockFilteredTasks = mockTasksForDate;
       }
+      
+      setTasks(mockFilteredTasks);
     } finally {
       setLoading(false);
     }
@@ -730,6 +774,13 @@ const TaskCalendarPage = () => {
   };
 
   const handleTaskEdit = (task: typeof mockTasks[0]) => {
+    // Check if this is a mock task (has simple ID like '1', '2', '3')
+    if (task.id && task.id.length < 10) {
+      console.log('Cannot edit mock task:', task.id);
+      alert('Cannot edit mock task. Please create a new task instead.');
+      return;
+    }
+    
     setEditingTask(task);
     setShowTaskForm(true);
   };
@@ -754,7 +805,7 @@ const TaskCalendarPage = () => {
     setShowTaskForm(true);
   };
 
-  const handleSaveTask = async (taskData: any) => {
+  const handleSaveTask = async (taskData: any, editMode?: 'single' | 'series') => {
     if (!isAuthenticated) {
       console.log('Mock save task:', taskData);
       setShowTaskForm(false);
@@ -767,16 +818,43 @@ const TaskCalendarPage = () => {
       console.log('Saving task:', taskData);
       console.log('Original points:', taskData.points);
       console.log('Transformed points for backend:', transformedPoints);
+      console.log('Edit mode:', editMode);
       
       if (editingTask) {
-        // Update existing task
-        await apiClient.updateTask(editingTask.id, {
-          name: taskData.title,
-          description: taskData.description,
-          date: taskData.date,
-          categories: taskData.categories,
-          points: transformedPoints
-        });
+        // Check if this is a mock task (has simple ID like '1', '2', '3')
+        if (editingTask.id && editingTask.id.length < 10) {
+          console.error('Cannot update mock task. Please create a new task instead.');
+          alert('Cannot update mock task. Please create a new task instead.');
+          setShowTaskForm(false);
+          setEditingTask(undefined);
+          return;
+        }
+        
+        // Check if this is a recurring task and editMode is specified
+        if (editingTask.repeatFrequency && editingTask.repeatFrequency !== 'none' && editMode === 'series') {
+          // Update entire recurring series
+          console.log('Updating entire recurring series for task:', editingTask.id);
+          await apiClient.updateRecurringInstances(editingTask.id, {
+            updates: {
+              name: taskData.title,
+              description: taskData.description,
+              categories: taskData.categories,
+              points: transformedPoints
+            },
+            filters: {
+              date_from: editingTask.date // Only update future instances
+            }
+          });
+        } else {
+          // Update single task instance
+          await apiClient.updateTask(editingTask.id, {
+            name: taskData.title,
+            description: taskData.description,
+            date: taskData.date,
+            categories: taskData.categories,
+            points: transformedPoints
+          });
+        }
       } else {
         // Check if this is a recurring task
         if (taskData.repeatFrequency && taskData.repeatFrequency !== 'none') {
@@ -796,27 +874,27 @@ const TaskCalendarPage = () => {
           };
           console.log('Creating recurring task with payload:', recurringPayload);
           await apiClient.createRecurringRule(recurringPayload);
-               } else {
-         // Create regular one-time task
-         const taskPayload = {
-           name: taskData.title,
-           description: taskData.description,
-           date: taskData.date,
-           categories: taskData.categories,
-           points: transformedPoints,
-           status: 'pending' as const
-         };
-         console.log('Creating one-time task with payload:', taskPayload);
-         console.log('Task date format:', taskData.date, 'Type:', typeof taskData.date);
-         const result = await apiClient.createTask(taskPayload);
-         console.log('Task creation result:', result);
-         console.log('Task creation successful, refreshing tasks...');
-         console.log('Created task details:', result.task);
-       }
+        } else {
+          // Create regular one-time task
+          const taskPayload = {
+            name: taskData.title,
+            description: taskData.description,
+            date: taskData.date,
+            categories: taskData.categories,
+            points: transformedPoints,
+            status: 'pending' as const
+          };
+          console.log('Creating one-time task with payload:', taskPayload);
+          console.log('Task date format:', taskData.date, 'Type:', typeof taskData.date);
+          const result = await apiClient.createTask(taskPayload);
+          console.log('Task creation result:', result);
+          console.log('Task creation successful, refreshing tasks...');
+          console.log('Created task details:', result.task);
+        }
       }
       
-    setShowTaskForm(false);
-    setEditingTask(undefined);
+      setShowTaskForm(false);
+      setEditingTask(undefined);
       await loadTasks(); // Refresh tasks
     } catch (error) {
       console.error('Error saving task:', error);
@@ -829,9 +907,8 @@ const TaskCalendarPage = () => {
   };
 
   const getFilteredTasks = () => {
-    // Since we're already filtering by date in loadTasks, just return the tasks
-    // They should already be for the selected date
-    console.log('Returning tasks for selected date:', tasks.length, 'tasks');
+    // Tasks are already filtered based on the current view in loadTasks
+    console.log('Returning filtered tasks for view:', taskView, 'count:', tasks.length);
     return tasks;
   };
 
@@ -849,6 +926,26 @@ const TaskCalendarPage = () => {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Calendar Section */}
           <div className="lg:col-span-2 space-y-4">
+            {/* Mock Data Notice */}
+            {!isAuthenticated && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs font-bold">i</span>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-blue-900 mb-1">Demo Mode</h4>
+                    <p className="text-sm text-blue-700 mb-2">
+                      You're currently viewing mock data. Tasks with simple IDs (1, 2, 3...) are demo tasks and cannot be edited or deleted.
+                    </p>
+                    <p className="text-sm text-blue-700">
+                      <strong>To create and manage real tasks:</strong> Sign in to your account and create new tasks. Real tasks will have unique IDs and can be fully edited.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {/* Calendar View Toggle */}
             <div className="flex justify-end">
               <ToggleTabs
@@ -885,11 +982,11 @@ const TaskCalendarPage = () => {
               
               <ToggleTabs
                 value={taskView}
-                   onValueChange={(value) => setTaskView(value as 'daily' | 'weekly' | 'tasks')}
+                onValueChange={(value) => setTaskView(value as 'daily' | 'weekly' | 'tasks')}
                 items={[
                   { value: 'daily', label: 'Daily' },
                   { value: 'weekly', label: 'Weekly' },
-                     { value: 'tasks', label: 'Tasks' }
+                  { value: 'tasks', label: 'Other Tasks' }
                 ]}
               />
             </Card>

@@ -12,7 +12,7 @@ interface Task {
   id: string;
   title: string;
   description?: string;
-  date: string;
+  date?: string; // Made optional to support tasks without dates
   categories: string[];
   duration: number;
   completed: boolean;
@@ -28,7 +28,7 @@ interface Task {
 
 interface TaskListProps {
   tasks: Task[];
-  view: 'daily' | 'weekly' | 'goals';
+  view: 'daily' | 'weekly' | 'tasks'; // Updated to include 'tasks' view
   selectedDate: Date;
   onTaskToggle: (taskId: string) => void;
   onTaskEdit: (task: Task) => void;
@@ -67,7 +67,11 @@ const TaskList = ({
     <Card className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <h3 className={TYPOGRAPHY.sectionHeader}>Daily Tasks</h3>
+          <h3 className={TYPOGRAPHY.sectionHeader}>
+            {view === 'daily' ? 'Daily Tasks' : 
+             view === 'weekly' ? 'Weekly Tasks' : 
+             'Other Tasks'}
+          </h3>
           <Badge variant="secondary" className="text-xs">
             {tasks.length} tasks
           </Badge>
@@ -88,7 +92,11 @@ const TaskList = ({
       <div className="space-y-3 max-h-96 overflow-y-auto">
         {tasks.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            <div className="text-lg font-medium mb-2">No tasks found for this time period.</div>
+            <div className="text-lg font-medium mb-2">
+              {view === 'daily' ? 'No tasks found for this date.' :
+               view === 'weekly' ? 'No tasks found for this week.' :
+               'No tasks without dates found.'}
+            </div>
             <Button
               onClick={onAddTask}
               variant="outline"
@@ -212,11 +220,23 @@ const TaskList = ({
                       </div>
 
                       <div className="flex items-center gap-1 flex-shrink-0">
+                        {/* Show mock task indicator */}
+                        {task.id && task.id.length < 10 && (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">
+                            Mock
+                          </Badge>
+                        )}
+                        
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => onTaskEdit(task)}
-                          className="h-8 w-8 p-0"
+                          disabled={task.id && task.id.length < 10} // Disable for mock tasks
+                          className={cn(
+                            "h-8 w-8 p-0",
+                            task.id && task.id.length < 10 && "opacity-50 cursor-not-allowed"
+                          )}
+                          title={task.id && task.id.length < 10 ? "Cannot edit mock task" : "Edit task"}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -224,7 +244,12 @@ const TaskList = ({
                           variant="ghost"
                           size="sm"
                           onClick={() => onTaskDelete(task.id)}
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          disabled={task.id && task.id.length < 10} // Disable for mock tasks
+                          className={cn(
+                            "h-8 w-8 p-0 text-destructive hover:text-destructive",
+                            task.id && task.id.length < 10 && "opacity-50 cursor-not-allowed"
+                          )}
+                          title={task.id && task.id.length < 10 ? "Cannot delete mock task" : "Delete task"}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
