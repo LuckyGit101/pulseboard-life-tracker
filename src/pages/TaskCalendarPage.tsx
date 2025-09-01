@@ -610,17 +610,47 @@ const TaskCalendarPage = () => {
   const [calendarView, setCalendarView] = useState<'monthly' | 'weekly'>('monthly');
   const [taskView, setTaskView] = useState<'daily' | 'weekly' | 'tasks'>('daily');
   const [selectedDate, setSelectedDate] = useState(new Date(2025, 7, 24)); // August 24, 2025 (where the recurring task was created)
-  const [tasks, setTasks] = useState<typeof mockTasks>(mockTasks); // Start with mock, replace with real
+  const [tasks, setTasks] = useState<typeof mockTasks>([]); // Start empty, load based on auth status
   const [loading, setLoading] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [editingTask, setEditingTask] = useState<typeof mockTasks[0] | undefined>();
 
-  // Load real tasks when authenticated
+  // Load tasks based on authentication status
   useEffect(() => {
     if (isAuthenticated) {
       loadTasks();
+    } else {
+      // Load mock data for demo mode
+      loadMockTasks();
     }
   }, [isAuthenticated, selectedDate, taskView]);
+
+  const loadMockTasks = () => {
+    console.log('Loading mock tasks for demo mode...');
+    
+    let mockFilteredTasks;
+    if (taskView === 'tasks') {
+      // For "Other Tasks" view, show all tasks without dates
+      mockFilteredTasks = mockTasks.filter(task => !task.date);
+    } else if (taskView === 'weekly') {
+      // For weekly view, filter mock data by week range
+      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
+      const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 });
+      
+      mockFilteredTasks = mockTasks.filter(task => {
+        if (!task.date) return false;
+        const taskDate = new Date(task.date);
+        return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
+      });
+    } else {
+      // For daily view, filter mock data by selected date
+      const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+      mockFilteredTasks = mockTasks.filter(task => task.date === selectedDateStr);
+    }
+    
+    setTasks(mockFilteredTasks);
+    console.log('Mock tasks loaded:', mockFilteredTasks.length, 'tasks');
+  };
 
   const loadTasks = async () => {
     setLoading(true);
@@ -688,64 +718,14 @@ const TaskCalendarPage = () => {
         
         setTasks(filteredTasks);
       } else {
-        // No real tasks, use mock data
-        let mockFilteredTasks;
-        if (taskView === 'tasks') {
-          // For "Other Tasks" view, show all tasks without dates
-          console.log('No real tasks found, using mock data for tasks without dates');
-          mockFilteredTasks = mockTasks.filter(task => !task.date);
-          console.log('Mock tasks without dates:', mockFilteredTasks.length, 'tasks');
-        } else if (taskView === 'weekly') {
-          // For weekly view, filter mock data by week range
-          const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 }); // Sunday = 0
-          const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 }); // Saturday = 6
-          
-          mockFilteredTasks = mockTasks.filter(task => {
-            if (!task.date) return false; // Exclude tasks without dates in weekly view
-            const taskDate = new Date(task.date);
-            return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
-          });
-          console.log('Mock weekly tasks:', mockFilteredTasks.length, 'tasks for week', format(weekStart, 'yyyy-MM-dd'), 'to', format(weekEnd, 'yyyy-MM-dd'));
-        } else {
-          // For daily view, use mock data for the selected date only
-          const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
-          console.log('No real tasks found, using mock data for date:', selectedDateStr);
-          mockFilteredTasks = mockTasks.filter(task => task.date === selectedDateStr);
-          console.log('Mock tasks for date:', selectedDateStr, ':', mockFilteredTasks.length, 'tasks');
-        }
-        
-        setTasks(mockFilteredTasks);
+        // No real tasks found, set empty array
+        console.log('No real tasks found, setting empty array');
+        setTasks([]);
       }
     } catch (error) {
       console.error('Error loading tasks:', error);
-      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
-      // Fallback to mock data
-      let mockFilteredTasks;
-      if (taskView === 'tasks') {
-        // For "Other Tasks" view, show all tasks without dates
-        const mockTasksWithoutDate = mockTasks.filter(task => !task.date);
-        console.log('Fallback to mock data for tasks without dates:', mockTasksWithoutDate.length, 'tasks');
-        mockFilteredTasks = mockTasksWithoutDate;
-      } else if (taskView === 'weekly') {
-        // For weekly view, filter mock data by week range
-        const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 }); // Sunday = 0
-        const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 }); // Saturday = 6
-        
-        mockFilteredTasks = mockTasks.filter(task => {
-          if (!task.date) return false; // Exclude tasks without dates in weekly view
-          const taskDate = new Date(task.date);
-          return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
-        });
-        console.log('Fallback mock weekly tasks:', mockFilteredTasks.length, 'tasks for week', format(weekStart, 'yyyy-MM-dd'), 'to', format(weekEnd, 'yyyy-MM-dd'));
-      } else {
-        // For daily view, use mock data for the selected date only
-        const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
-        const mockTasksForDate = mockTasks.filter(task => task.date === selectedDateStr);
-        console.log('Fallback to mock data for date:', selectedDateStr, ':', mockTasksForDate.length, 'tasks');
-        mockFilteredTasks = mockTasksForDate;
-      }
-      
-      setTasks(mockFilteredTasks);
+      // On error, set empty array instead of falling back to mock data
+      setTasks([]);
     } finally {
       setLoading(false);
     }

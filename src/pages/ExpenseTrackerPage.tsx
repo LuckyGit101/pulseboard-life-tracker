@@ -13,6 +13,7 @@ import { mockExpenses, mockIncome, trendData } from '@/data/mockData';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
 import { apiClient, Expense } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCategories } from '@/contexts/CategoryContext';
 
 // Debug logging to check data
 console.log('ExpenseTrackerPage - expenseData:', mockExpenses);
@@ -40,6 +41,8 @@ const categories = Object.keys(EXPENSE_CATEGORIES);
 
 const ExpenseTrackerPage = () => {
   const { isAuthenticated } = useAuth();
+  const { getByType } = useCategories();
+  const expenseCategories = getByType('expense');
   const [entryType, setEntryType] = useState<'expense' | 'income'>('expense');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,12 +61,46 @@ const ExpenseTrackerPage = () => {
     amountMax: ''
   });
 
-  // Load real expenses when authenticated
+  // Load expenses based on authentication status
   useEffect(() => {
     if (isAuthenticated) {
       loadExpenses();
+    } else {
+      // Load mock data for demo mode
+      loadMockExpenses();
     }
   }, [isAuthenticated]);
+
+  const loadMockExpenses = () => {
+    console.log('Loading mock expenses for demo mode...');
+    // Set some mock expenses for demo
+    const mockExpenses = [
+      {
+        id: 'mock-1',
+        userId: 'mock',
+        name: 'Grocery Shopping',
+        amount: 2500,
+        category: 'Food',
+        date: '2025-08-24',
+        isRecurring: false,
+        createdAt: '2025-08-24T10:00:00Z',
+        updatedAt: '2025-08-24T10:00:00Z'
+      },
+      {
+        id: 'mock-2',
+        userId: 'mock',
+        name: 'Fuel',
+        amount: 1200,
+        category: 'Transport',
+        date: '2025-08-23',
+        isRecurring: false,
+        createdAt: '2025-08-23T15:30:00Z',
+        updatedAt: '2025-08-23T15:30:00Z'
+      }
+    ];
+    setExpenses(mockExpenses);
+    console.log('Mock expenses loaded:', mockExpenses.length, 'expenses');
+  };
 
   const loadExpenses = async () => {
     setLoading(true);
@@ -74,7 +111,8 @@ const ExpenseTrackerPage = () => {
       setExpenses(apiExpenses);
     } catch (error) {
       console.error('Error loading expenses:', error);
-      // Keep existing expenses or use empty array
+      // On error, set empty array instead of keeping existing data
+      setExpenses([]);
     } finally {
       setLoading(false);
     }
@@ -110,12 +148,18 @@ const ExpenseTrackerPage = () => {
     }
   ]);
 
+  // Editing state for existing expenses
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+
   // Ref for scrolling to recent transactions
   const recentTransactionsRef = useRef<HTMLDivElement>(null);
 
   // Get the appropriate categories based on entry type
   const getCategories = () => {
-    return entryType === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+    return entryType === 'expense' ? 
+      expenseCategories.reduce((acc, cat) => ({ ...acc, [cat.id]: { name: cat.name, color: cat.color } }), {}) : 
+      INCOME_CATEGORIES;
   };
 
   // Reset form data when switching entry types
@@ -220,10 +264,47 @@ const ExpenseTrackerPage = () => {
 
 
 
-  const handleRecurringExpenseSubmit = (id: string, amount: string) => {
-    if (amount && parseFloat(amount) > 0) {
-      console.log('Add recurring expense:', { id, amount });
-      // Reset the amount for this recurring expense
+  const handleRecurringExpenseSubmit = async (
+    id: string,
+    amount: string,
+    name: string,
+    category: string,
+    date: string
+  ) => {
+    if (!amount || parseFloat(amount) <= 0 || !name.trim()) return;
+
+    const expensePayload = {
+      name,
+      amount: parseFloat(amount),
+      category,
+      date,
+      isRecurring: true,
+      notes: undefined as string | undefined
+    };
+
+    try {
+      if (isAuthenticated) {
+        await apiClient.createExpense(expensePayload as any);
+        await loadExpenses();
+      } else {
+        // In demo mode, update local state so the list reflects the addition
+        const newExpense: Expense = {
+          id: `mock-${Date.now()}`,
+          userId: 'mock',
+          name,
+          amount: parseFloat(amount),
+          category,
+          date,
+          isRecurring: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as Expense;
+        setExpenses(prev => [newExpense, ...prev]);
+      }
+    } catch (error) {
+      console.error('Error creating recurring expense from quick card:', error);
+    } finally {
+      // Reset only the amount to keep card as a prefilled quick form
       setRecurringExpenses(prev => 
         prev.map(expense => 
           expense.id === id 
@@ -296,8 +377,34 @@ const ExpenseTrackerPage = () => {
     }
 
     if (!isAuthenticated) {
-      console.log('Mock save expense:', formData);
-      // Reset form for mock mode
+      // Demo mode: add to local state so it appears in list
+      const newExpense: Expense = {
+        id: `mock-${Date.now()}`,
+        userId: 'mock',
+        name: formData.name,
+        amount: parseFloat(formData.amount),
+        category: formData.category,
+        date: formData.date,
+        isRecurring: formData.isRecurring,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Expense;
+      setExpenses(prev => [newExpense, ...prev]);
+
+      // If marked recurring, add a quick-add card for convenience
+      if (formData.isRecurring) {
+        setRecurringExpenses(prev => [
+          ...prev,
+          {
+            id: `rec-${Date.now()}`,
+            name: formData.name,
+            category: formData.category,
+            amount: '',
+            date: formData.date
+          }
+        ]);
+      }
+
       setFormData({
         name: '',
         amount: '',
@@ -320,6 +427,20 @@ const ExpenseTrackerPage = () => {
         notes: undefined
       });
 
+      // If marked recurring, add a quick-add card in the UI as a template
+      if (formData.isRecurring) {
+        setRecurringExpenses(prev => [
+          ...prev,
+          {
+            id: `rec-${Date.now()}`,
+            name: formData.name,
+            category: formData.category,
+            amount: '',
+            date: formData.date
+          }
+        ]);
+      }
+
       // Reset form on success
       setFormData({
         name: '',
@@ -338,6 +459,44 @@ const ExpenseTrackerPage = () => {
     }
   };
 
+  // Open edit modal from list
+  const handleExpenseClick = (entry: Expense) => {
+    setEditingExpense(entry);
+    setShowExpenseModal(true);
+  };
+
+  // Save edits from modal
+  const handleEditExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingExpense) return;
+
+    try {
+      if (isAuthenticated) {
+        await apiClient.updateExpense(editingExpense.id, {
+          name: editingExpense.name,
+          amount: editingExpense.amount,
+          category: editingExpense.category,
+          date: editingExpense.date,
+        });
+        await loadExpenses();
+      } else {
+        // Demo mode: update local state only
+        setExpenses(prev => prev.map(exp => exp.id === editingExpense.id ? {
+          ...exp,
+          name: editingExpense.name,
+          amount: editingExpense.amount,
+          category: editingExpense.category,
+          date: editingExpense.date,
+          updatedAt: new Date().toISOString(),
+        } : exp));
+      }
+      setShowExpenseModal(false);
+      setEditingExpense(null);
+    } catch (error) {
+      console.error('Error updating expense:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white bg-gradient-to-b from-[#f5f6fa] to-[#e9eafc] p-6 lg:p-10">
       <div className="container mx-auto max-w-7xl space-y-6">
@@ -348,6 +507,26 @@ const ExpenseTrackerPage = () => {
             <p className={TYPOGRAPHY.bodyText}>Track your income and expenses</p>
           </div>
         </div>
+
+        {/* Demo Mode Notice */}
+        {!isAuthenticated && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-white text-xs font-bold">i</span>
+              </div>
+              <div>
+                <h4 className="font-medium text-blue-900 mb-1">Demo Mode</h4>
+                <p className="text-sm text-blue-700 mb-2">
+                  You're currently viewing mock data. Expenses with IDs starting with "mock-" are demo data and cannot be edited or deleted.
+                </p>
+                <p className="text-sm text-blue-700">
+                  <strong>To create and manage real expenses:</strong> Sign in to your account and create new expenses. Real expenses will have unique IDs and can be fully edited.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Add Entry Section */}
@@ -399,11 +578,21 @@ const ExpenseTrackerPage = () => {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(getCategories()).map(([key, category]) => (
-                      <SelectItem key={key} value={category.name}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
+                    {entryType === 'expense' ? 
+                      expenseCategories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.name}>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color || '#94a3b8' }} />
+                            {cat.name}
+                          </div>
+                        </SelectItem>
+                      )) :
+                      Object.entries(INCOME_CATEGORIES).map(([key, category]) => (
+                        <SelectItem key={key} value={category.name}>
+                          {category.name}
+                        </SelectItem>
+                      ))
+                    }
                   </SelectContent>
                 </Select>
               </div>
@@ -447,35 +636,72 @@ const ExpenseTrackerPage = () => {
                 </div>
                 <div className="space-y-3 overflow-y-auto max-h-60">
                   {recurringExpenses.map((expense) => (
-                    <div key={expense.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm truncate">{expense.name}</span>
-                          <Badge variant="outline" className="text-xs">{expense.category}</Badge>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {new Date(expense.date).toLocaleDateString()}
-                        </div>
-                      </div>
+                    <div key={expense.id} className="p-3 bg-gray-50 rounded-lg space-y-2">
+                      {/* Name */}
                       <div className="flex items-center gap-2">
+                        <Label className="text-xs font-medium w-16">Name</Label>
+                        <Input
+                          value={expense.name}
+                          onChange={(e) => setRecurringExpenses(prev => 
+                            prev.map(exp => exp.id === expense.id ? { ...exp, name: e.target.value } : exp)
+                          )}
+                          className="h-8 text-sm"
+                          placeholder="Expense name"
+                        />
+                      </div>
+                      {/* Category */}
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs font-medium w-16">Category</Label>
+                        <Select
+                          value={expense.category}
+                          onValueChange={(value) => setRecurringExpenses(prev => 
+                            prev.map(exp => exp.id === expense.id ? { ...exp, category: value } : exp)
+                          )}
+                        >
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {expenseCategories.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.name}>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color || '#94a3b8' }} />
+                                  {cat.name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {/* Date */}
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs font-medium w-16">Date</Label>
+                        <Input
+                          type="date"
+                          value={expense.date}
+                          onChange={(e) => setRecurringExpenses(prev => 
+                            prev.map(exp => exp.id === expense.id ? { ...exp, date: e.target.value } : exp)
+                          )}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      {/* Amount + Add */}
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs font-medium w-16">Amount</Label>
                         <Input
                           type="number"
-                          placeholder="Amount"
+                          placeholder="0.00"
                           value={expense.amount}
                           onChange={(e) => setRecurringExpenses(prev => 
-                            prev.map(exp => 
-                              exp.id === expense.id 
-                                ? { ...exp, amount: e.target.value }
-                                : exp
-                            )
+                            prev.map(exp => exp.id === expense.id ? { ...exp, amount: e.target.value } : exp)
                           )}
-                          className="w-24 bg-background border-border text-foreground text-sm"
+                          className="h-8 text-sm"
                         />
                         <Button
                           type="button"
                           size="sm"
-                          onClick={() => handleRecurringExpenseSubmit(expense.id, expense.amount)}
-                          disabled={!expense.amount || parseFloat(expense.amount) <= 0}
+                          onClick={() => handleRecurringExpenseSubmit(expense.id, expense.amount, expense.name, expense.category, expense.date)}
+                          disabled={!expense.amount || parseFloat(expense.amount) <= 0 || !expense.name.trim()}
                           className="rounded-full px-3 py-1 text-xs font-semibold shadow-md bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:scale-105 transition-all duration-200"
                         >
                           Add
@@ -737,7 +963,11 @@ const ExpenseTrackerPage = () => {
             <div className="space-y-3">
               {filteredData.length > 0 ? (
                 filteredData.map((entry) => (
-                  <div key={entry.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                  <div
+                    key={entry.id}
+                    className="flex items-center justify-between p-4 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors"
+                    onClick={() => handleExpenseClick(entry)}
+                  >
                     <div className="flex items-center gap-4">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                         entryType === 'expense' ? 'bg-red-100' : 'bg-green-100'
@@ -777,6 +1007,70 @@ const ExpenseTrackerPage = () => {
             </div>
           </Card>
         </div>
+        {/* Expense Edit Modal */}
+        {showExpenseModal && editingExpense && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold mb-4">Edit Expense</h3>
+              <form onSubmit={handleEditExpense} className="space-y-4">
+                <div>
+                  <Label htmlFor="edit-name">Name</Label>
+                  <Input
+                    id="edit-name"
+                    value={editingExpense.name}
+                    onChange={(e) => setEditingExpense(prev => prev ? { ...prev, name: e.target.value } : prev)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-category">Category</Label>
+                  <Select
+                    value={editingExpense.category}
+                    onValueChange={(value) => setEditingExpense(prev => prev ? { ...prev, category: value } : prev)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                                                <SelectContent>
+                              {expenseCategories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.name}>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color || '#94a3b8' }} />
+                                    {cat.name}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="edit-amount">Amount</Label>
+                  <Input
+                    id="edit-amount"
+                    type="number"
+                    value={editingExpense.amount}
+                    onChange={(e) => setEditingExpense(prev => prev ? { ...prev, amount: parseFloat(e.target.value || '0') } : prev)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-date">Date</Label>
+                  <Input
+                    id="edit-date"
+                    type="date"
+                    value={editingExpense.date}
+                    onChange={(e) => setEditingExpense(prev => prev ? { ...prev, date: e.target.value } : prev)}
+                    required
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button type="submit" className="flex-1">Save</Button>
+                  <Button type="button" variant="outline" onClick={() => { setShowExpenseModal(false); setEditingExpense(null); }}>Cancel</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

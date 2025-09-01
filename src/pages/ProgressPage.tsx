@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import StatBar from '@/components/ui/stat-bar';
@@ -8,6 +8,9 @@ import { ChartContainer, ChartTooltipContent, ChartLegendContent } from '@/compo
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { format, subDays, startOfWeek, startOfMonth, isWithinInterval, parseISO } from 'date-fns';
 import { STANDARD_CATEGORIES, TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
+import { useCategories } from '@/contexts/CategoryContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiClient } from '@/lib/api';
 
 // Mock data - Updated to use only 5 standard categories
 const stats = [
@@ -165,21 +168,27 @@ const colors = ['#22c55e', '#f59e0b', '#8b5cf6', '#3b82f6', '#ef4444'];
 
 function generateDummyLineData() {
   const data = [];
-  let current = [10, 8, 7, 5, 6];
+  // Start with more realistic baseline values
+  let current = [48, 28, 22, 18, 15];
+  
   for (let i = 90; i >= 0; i--) {
     const date = subDays(new Date(), i);
-    // Simulate some progress with more realistic variations
+    // Simulate more realistic progress with trends
     current = current.map((v, idx) => {
-      const change = Math.random() > 0.5 ? Math.floor(Math.random() * 3) : -Math.floor(Math.random() * 2);
-      return Math.max(0, v + change);
+      // Add some trend and randomness
+      const trend = Math.sin(i / 10 + idx) * 0.5; // Cyclical trend
+      const random = (Math.random() - 0.5) * 2; // Random variation
+      const change = trend + random;
+      return Math.max(0, Math.min(100, v + change)); // Keep within 0-100 range
     });
+    
     data.push({
       date: format(date, 'yyyy-MM-dd'),
-      Health: current[0],
-      Strength: current[1],
-      Mind: current[2],
-      Work: current[3],
-      Spirit: current[4],
+      Health: Math.round(current[0]),
+      Strength: Math.round(current[1]),
+      Mind: Math.round(current[2]),
+      Work: Math.round(current[3]),
+      Spirit: Math.round(current[4]),
     });
   }
   return data;
@@ -234,28 +243,66 @@ function getPieData(filteredLineData) {
 }
 
 const ProgressPage = () => {
+  const { isAuthenticated } = useAuth();
+  const { getByType } = useCategories();
+  const taskCategories = getByType('task');
   const [achievementFilter, setAchievementFilter] = useState<'ongoing' | 'completed' | 'missed'>('ongoing');
   const [lineRange, setLineRange] = useState('week');
   const [pieRange, setPieRange] = useState('week');
   const [lineCustom, setLineCustom] = useState({ from: null, to: null });
   const [pieCustom, setPieCustom] = useState({ from: null, to: null });
   const [isCreatingGoal, setIsCreatingGoal] = useState(false);
-  const [goals, setGoals] = useState(mockGoals);
-  const [goalForm, setGoalForm] = useState({
-    title: '',
-    startDate: '',
-    endDate: '',
-    categories: {
-      Health: { selected: false, points: '' },
-      Strength: { selected: false, points: '' },
-      Mind: { selected: false, points: '' },
-      Work: { selected: false, points: '' },
-      Spirit: { selected: false, points: '' }
-    }
+  const [goals, setGoals] = useState<typeof mockGoals>([]);
+  const [loading, setLoading] = useState(false);
+  const [goalForm, setGoalForm] = useState(() => {
+    const initialCategories = taskCategories.reduce((acc, cat) => {
+      acc[cat.name] = { selected: false, points: '' };
+      return acc;
+    }, {} as Record<string, { selected: boolean; points: string }>);
+    
+    return {
+      title: '',
+      startDate: '',
+      endDate: '',
+      categories: initialCategories
+    };
   });
 
+  // Load goals based on authentication status
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadGoals();
+    } else {
+      // Load mock data for demo mode
+      loadMockGoals();
+    }
+  }, [isAuthenticated]);
+
+  const loadMockGoals = () => {
+    console.log('Loading mock goals for demo mode...');
+    setGoals(mockGoals);
+    console.log('Mock goals loaded:', mockGoals.length, 'goals');
+  };
+
+  const loadGoals = async () => {
+    setLoading(true);
+    try {
+      console.log('Loading goals from API...');
+      const apiGoals = await apiClient.getGoals();
+      console.log('Loaded goals:', apiGoals);
+      setGoals(apiGoals);
+    } catch (error) {
+      console.error('Error loading goals:', error);
+      // On error, set empty array
+      setGoals([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredLineData = filterLineData(lineRange, lineCustom);
-  const pieData = getPieData(filterLineData(pieRange, pieCustom));
+  const filteredPieData = filterLineData(pieRange, pieCustom);
+  const pieData = getPieData(filteredPieData);
 
   const handleCreateGoal = () => {
     const selectedCategories = Object.entries(goalForm.categories)
@@ -281,17 +328,16 @@ const ProgressPage = () => {
 
     setGoals(prev => [...prev, newGoal]);
     setIsCreatingGoal(false);
+    const resetCategories = taskCategories.reduce((acc, cat) => {
+      acc[cat.name] = { selected: false, points: '' };
+      return acc;
+    }, {} as Record<string, { selected: boolean; points: string }>);
+    
     setGoalForm({
       title: '',
       startDate: '',
       endDate: '',
-      categories: {
-        Health: { selected: false, points: '' },
-        Strength: { selected: false, points: '' },
-        Mind: { selected: false, points: '' },
-        Work: { selected: false, points: '' },
-        Spirit: { selected: false, points: '' }
-      }
+      categories: resetCategories
     });
   };
 
@@ -301,17 +347,16 @@ const ProgressPage = () => {
 
   const handleCancelGoal = () => {
     setIsCreatingGoal(false);
+    const resetCategories = taskCategories.reduce((acc, cat) => {
+      acc[cat.name] = { selected: false, points: '' };
+      return acc;
+    }, {} as Record<string, { selected: boolean; points: string }>);
+    
     setGoalForm({
       title: '',
       startDate: '',
       endDate: '',
-      categories: {
-        Health: { selected: false, points: '' },
-        Strength: { selected: false, points: '' },
-        Mind: { selected: false, points: '' },
-        Work: { selected: false, points: '' },
-        Spirit: { selected: false, points: '' }
-      }
+      categories: resetCategories
     });
   };
 
@@ -359,10 +404,30 @@ const ProgressPage = () => {
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h2 className={TYPOGRAPHY.pageTitle}>Your Progress Dashboard</h2>
-            <p className={TYPOGRAPHY.bodyText}>Track your achievements and growth across all categories</p>
+            <h2 className={TYPOGRAPHY.pageTitle}>Progress & Goals</h2>
+            <p className={TYPOGRAPHY.bodyText}>Track your progress and manage goals</p>
           </div>
         </div>
+
+        {/* Demo Mode Notice */}
+        {!isAuthenticated && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-white text-xs font-bold">i</span>
+              </div>
+              <div>
+                <h4 className="font-medium text-blue-900 mb-1">Demo Mode</h4>
+                <p className="text-sm text-blue-700 mb-2">
+                  You're currently viewing mock data. Goals and progress data shown are demo data and cannot be edited or deleted.
+                </p>
+                <p className="text-sm text-blue-700">
+                  <strong>To create and manage real goals:</strong> Sign in to your account and create new goals. Real goals will have unique IDs and can be fully edited.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats Overview */}
         <div className="grid grid-cols-10 gap-6">
@@ -478,29 +543,29 @@ const ProgressPage = () => {
               </div>
               </div>
             
-            {/* Date Range Inputs - Always Visible */}
-            <div className="flex gap-3 mb-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-sm text-muted-foreground">Start Date</label>
-                <input 
-                  type="date" 
-                  className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
-                  value={lineRange === 'week' ? format(startOfWeek(new Date()), 'yyyy-MM-dd') : 
-                         lineRange === 'month' ? format(startOfMonth(new Date()), 'yyyy-MM-dd') : 
-                         lineCustom.from ? format(lineCustom.from, 'yyyy-MM-dd') : ''}
-                  onChange={e => setLineCustom(c => ({...c, from: new Date(e.target.value)}))} 
-                />
+            {/* Date Range Inputs - Only Visible for Custom Range */}
+            {lineRange === 'custom' && (
+              <div className="flex gap-3 mb-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm text-muted-foreground">Start Date</label>
+                  <input 
+                    type="date" 
+                    className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
+                    value={lineCustom.from ? format(lineCustom.from, 'yyyy-MM-dd') : ''}
+                    onChange={e => setLineCustom(c => ({...c, from: new Date(e.target.value)}))} 
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm text-muted-foreground">End Date</label>
+                  <input 
+                    type="date" 
+                    className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
+                    value={lineCustom.to ? format(lineCustom.to, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')}
+                    onChange={e => setLineCustom(c => ({...c, to: new Date(e.target.value)}))} 
+                  />
+                </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-sm text-muted-foreground">End Date</label>
-                <input 
-                  type="date" 
-                  className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
-                  value={lineCustom.to ? format(lineCustom.to, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')}
-                  onChange={e => setLineCustom(c => ({...c, to: new Date(e.target.value)}))} 
-                />
-              </div>
-        </div>
+            )}
 
             <div className="h-80 w-full">
               <ChartContainer 
@@ -569,29 +634,29 @@ const ProgressPage = () => {
               </div>
             </div>
             
-            {/* Date Range Inputs - Always Visible */}
-            <div className="flex gap-3 mb-4">
-              <div className="flex flex-col gap-1">
-                <label className="text-sm text-muted-foreground">Start Date</label>
-                <input 
-                  type="date" 
-                  className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
-                  value={pieRange === 'week' ? format(startOfWeek(new Date()), 'yyyy-MM-dd') : 
-                         pieRange === 'month' ? format(startOfMonth(new Date()), 'yyyy-MM-dd') : 
-                         pieCustom.from ? format(pieCustom.from, 'yyyy-MM-dd') : ''}
-                  onChange={e => setPieCustom(c => ({...c, from: new Date(e.target.value)}))} 
-                />
+            {/* Date Range Inputs - Only Visible for Custom Range */}
+            {pieRange === 'custom' && (
+              <div className="flex gap-3 mb-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm text-muted-foreground">Start Date</label>
+                  <input 
+                    type="date" 
+                    className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
+                    value={pieCustom.from ? format(pieCustom.from, 'yyyy-MM-dd') : ''}
+                    onChange={e => setPieCustom(c => ({...c, from: new Date(e.target.value)}))} 
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm text-muted-foreground">End Date</label>
+                  <input 
+                    type="date" 
+                    className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
+                    value={pieCustom.to ? format(pieCustom.to, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')}
+                    onChange={e => setPieCustom(c => ({...c, to: new Date(e.target.value)}))} 
+                  />
+                </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-sm text-muted-foreground">End Date</label>
-                <input 
-                  type="date" 
-                  className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
-                  value={pieCustom.to ? format(pieCustom.to, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')}
-                  onChange={e => setPieCustom(c => ({...c, to: new Date(e.target.value)}))} 
-                />
-              </div>
-            </div>
+            )}
             
             <div className="h-80 w-full">
               <ChartContainer 
@@ -745,79 +810,81 @@ const ProgressPage = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                             {goals.map((goal) => {
-                 const progress = (goal.currentPoints / goal.totalPoints) * 100;
-                 const isIncomplete = !goal.completed && progress < 50;
-                 
-                 return (
-                   <div 
-                     key={goal.id} 
-                     className={`rounded-2xl p-4 flex flex-col gap-2 shadow-lg border-2 ${getGoalBackground(goal)} relative cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl active:scale-95`}
-                     onClick={() => {
-                       // Add click effect - you can add modal or navigation here
-                       console.log('Goal clicked:', goal.title);
-                     }}
-                   >
-                     {/* Delete Button */}
-                     <button
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         handleDeleteGoal(goal.id);
-                       }}
-                       className="absolute top-2 right-2 p-1 rounded-full bg-red-100 hover:bg-red-200 transition-colors z-10"
-                     >
-                       <Trash2 className="h-4 w-4 text-red-600" />
-                     </button>
-                     
-                     {/* Completion Status */}
-                     <div className="flex items-center gap-2 mb-2">
-                       {goal.completed ? (
-                         <CheckCircle className="h-5 w-5 text-amber-600" />
-                       ) : (
-                         <Circle className={`h-5 w-5 ${isIncomplete ? 'text-gray-500' : 'text-emerald-300'}`} />
-                       )}
-                       <div className={`font-semibold text-base ${isIncomplete ? 'text-gray-600' : 'text-gray-700'}`}>
-                         {goal.title}
-                       </div>
-                     </div>
-                     
-                     {/* Categories */}
-                     <div className="flex gap-2 flex-wrap">
-                       {Object.keys(goal.categories).map(category => (
-                         <span key={category} className={`text-xs px-2 py-0.5 rounded ${isIncomplete ? 'bg-gray-300 text-gray-600' : getCategoryColor(category)}`}>
-                           {category}
-                         </span>
-            ))}
-          </div>
-                     
-                     {/* Points Progress */}
-                     <div className="mt-2">
-                       <div className="flex justify-between items-center text-sm">
-                         <span className={`font-medium ${isIncomplete ? 'text-gray-500' : ''}`}>
-                           {goal.completed ? 'Completed' : `${goal.currentPoints}/${goal.totalPoints} pts`}
-                         </span>
-                         <span className={`font-bold ${goal.completed ? 'text-amber-600' : isIncomplete ? 'text-gray-500' : 'text-emerald-400'}`}>
-                           {goal.totalPoints} pts
-                         </span>
-                       </div>
-                       {!goal.completed && (
-                         <div className="w-full h-2 bg-gray-200 rounded-full mt-1">
-                           <div 
-                             className={`h-2 rounded-full transition-all ${isIncomplete ? 'bg-gray-400' : 'bg-emerald-300'}`}
-                             style={{ width: `${(goal.currentPoints / goal.totalPoints) * 100}%` }} 
-                           />
-                         </div>
-                       )}
-                     </div>
-                     
-                     {/* Date Range */}
-                     <div className={`text-xs mt-1 ${isIncomplete ? 'text-gray-400' : 'text-gray-500'}`}>
-                       {goal.startDate} - {goal.endDate}
-                     </div>
-                   </div>
-                 );
-               })}
+            <div className="max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {goals.map((goal) => {
+                  const progress = (goal.currentPoints / goal.totalPoints) * 100;
+                  const isIncomplete = !goal.completed && progress < 50;
+                  
+                  return (
+                    <div 
+                      key={goal.id} 
+                      className={`rounded-2xl p-4 flex flex-col gap-2 shadow-lg border-2 ${getGoalBackground(goal)} relative cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl active:scale-95`}
+                      onClick={() => {
+                        // Add click effect - you can add modal or navigation here
+                        console.log('Goal clicked:', goal.title);
+                      }}
+                    >
+                      {/* Delete Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteGoal(goal.id);
+                        }}
+                        className="absolute top-2 right-2 p-1 rounded-full bg-red-100 hover:bg-red-200 transition-colors z-10"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                      </button>
+                      
+                      {/* Completion Status */}
+                      <div className="flex items-center gap-2 mb-2">
+                        {goal.completed ? (
+                          <CheckCircle className="h-5 w-5 text-amber-600" />
+                        ) : (
+                          <Circle className={`h-5 w-5 ${isIncomplete ? 'text-gray-500' : 'text-emerald-300'}`} />
+                        )}
+                        <div className={`font-semibold text-base ${isIncomplete ? 'text-gray-600' : 'text-gray-700'}`}>
+                          {goal.title}
+                        </div>
+                      </div>
+                      
+                      {/* Categories */}
+                      <div className="flex gap-2 flex-wrap">
+                        {Object.keys(goal.categories).map(category => (
+                          <span key={category} className={`text-xs px-2 py-0.5 rounded ${isIncomplete ? 'bg-gray-300 text-gray-600' : getCategoryColor(category)}`}>
+                            {category}
+                          </span>
+                        ))}
+                      </div>
+                      
+                      {/* Points Progress */}
+                      <div className="mt-2">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className={`font-medium ${isIncomplete ? 'text-gray-500' : ''}`}>
+                            {goal.completed ? 'Completed' : `${goal.currentPoints}/${goal.totalPoints} pts`}
+                          </span>
+                          <span className={`font-bold ${goal.completed ? 'text-amber-600' : isIncomplete ? 'text-gray-500' : 'text-emerald-400'}`}>
+                            {goal.totalPoints} pts
+                          </span>
+                        </div>
+                        {!goal.completed && (
+                          <div className="w-full h-2 bg-gray-200 rounded-full mt-1">
+                            <div 
+                              className={`h-2 rounded-full transition-all ${isIncomplete ? 'bg-gray-400' : 'bg-emerald-300'}`}
+                              style={{ width: `${(goal.currentPoints / goal.totalPoints) * 100}%` }} 
+                            />
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Date Range */}
+                      <div className={`text-xs mt-1 ${isIncomplete ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {goal.startDate} - {goal.endDate}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </Card>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Card } from '@/components/ui/card';
@@ -37,9 +37,11 @@ const SignupPage = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors }
+    formState: { errors },
+    control
   } = useForm<SignupFormData>({
-    resolver: zodResolver(signupSchema)
+    resolver: zodResolver(signupSchema),
+    defaultValues: { agreeToTerms: false }
   });
 
   const onSubmit = async (data: SignupFormData) => {
@@ -200,10 +202,20 @@ const SignupPage = () => {
             {/* Terms and Conditions */}
             <div className="space-y-2">
               <div className="flex items-start space-x-2">
-                <Checkbox 
-                  id="agreeToTerms" 
-                  className="mt-1"
-                  {...register('agreeToTerms')} 
+                {/* Replace register with Controller to ensure boolean */}
+                {/* Controller is imported from react-hook-form via named import */}
+                {/* @ts-expect-error Controller typed import not shown in this snippet */}
+                <Controller
+                  name="agreeToTerms"
+                  control={control}
+                  render={({ field }) => (
+                    <Checkbox
+                      id="agreeToTerms"
+                      className="mt-1"
+                      checked={!!field.value}
+                      onCheckedChange={(checked) => field.onChange(checked === true)}
+                    />
+                  )}
                 />
                 <Label htmlFor="agreeToTerms" className="text-sm text-gray-600 leading-relaxed">
                   I agree to the{' '}

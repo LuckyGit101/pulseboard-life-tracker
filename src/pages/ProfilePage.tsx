@@ -7,14 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { User, Mail, Calendar, Settings, Globe, Download, Shield, LogOut, ArrowRight, Bell, Moon } from 'lucide-react';
+import { User, Mail, Calendar, Settings, Globe, Download, Shield, LogOut, ArrowRight, Bell, Moon, Trash } from 'lucide-react';
 import { TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useCategories } from '@/contexts/CategoryContext';
 
 const ProfilePage = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { getByType, addCategory, updateCategory, deleteCategory, limits } = useCategories();
+  const [colorModal, setColorModal] = useState<{ id: string; color: string } | null>(null);
   
   const [userInfo, setUserInfo] = useState({
     name: user?.name || '',
@@ -302,6 +305,95 @@ const ProfilePage = () => {
             </div>
           </Card>
         </div>
+
+        {/* Category Manager */}
+        <Card className={LAYOUT.standardCard}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className={TYPOGRAPHY.sectionHeader}>Category Manager</h3>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {(['task','expense','investment'] as const).map((type) => (
+              <div key={type} className="p-4 rounded-lg border">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="font-medium capitalize">{type} Categories</div>
+                  <div className="text-sm text-muted-foreground">
+                    {limits[type] === null ? '∞' : `${getByType(type).length}/${limits[type]}`}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {getByType(type).map(cat => (
+                    <div key={cat.id} className="flex items-center gap-2">
+                      {/* Color circle with hidden color input */}
+                      <button
+                        type="button"
+                        aria-label="Edit color"
+                        className="w-5 h-5 rounded-full border"
+                        style={{ backgroundColor: cat.color || '#94a3b8' }}
+                        onClick={() => setColorModal({ id: cat.id, color: cat.color || '#94a3b8' })}
+                      />
+
+                      {/* Name inline edit */}
+                      <Input
+                        value={cat.name}
+                        onChange={(e) => updateCategory(cat.id, { name: e.target.value })}
+                        className="h-8 flex-1"
+                      />
+
+                      {/* Bin icon only */}
+                      <Button variant="ghost" size="icon" onClick={() => deleteCategory(cat.id)} aria-label="Delete category">
+                        <Trash className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-2 pt-2">
+                    <Input placeholder={`Add ${type} category`} className="h-8" id={`add-${type}`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const target = e.target as HTMLInputElement;
+                          const val = target.value.trim();
+                          if (!val) return;
+                          const res = addCategory(type, val);
+                          if (res.ok) target.value = '';
+                          else alert(res.error);
+                        }
+                      }}
+                    />
+                    <Button size="sm" onClick={() => {
+                      const input = document.getElementById(`add-${type}`) as HTMLInputElement | null;
+                      const val = (input?.value || '').trim();
+                      if (!val) return;
+                      const res = addCategory(type, val);
+                      if (res.ok && input) input.value = '';
+                      else if (!res.ok) alert(res.error);
+                    }}>Add</Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {colorModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-xl p-6 shadow-xl w-[420px] max-w-[90vw]">
+              <div className="text-lg font-semibold mb-4">Pick a color</div>
+              <div className="flex items-center justify-center mb-6">
+                <input
+                  type="color"
+                  value={colorModal.color}
+                  onChange={(e) => setColorModal({ ...colorModal, color: e.target.value })}
+                  className="w-40 h-40 rounded-full border appearance-none cursor-pointer"
+                  style={{ padding: 0, borderWidth: 2 }}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setColorModal(null)}>Cancel</Button>
+                <Button onClick={() => { updateCategory(colorModal.id, { color: colorModal.color }); setColorModal(null); }}>Save</Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Account Actions */}
         <Card className="p-6 bg-white shadow-card border border-border">

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { X } from 'lucide-react';
 import { STANDARD_CATEGORIES, TYPOGRAPHY } from '@/lib/designSystem';
+import { useCategories } from '@/contexts/CategoryContext';
 
 interface Task {
   id: string;
@@ -27,8 +28,7 @@ interface TaskFormProps {
   onCancel: () => void;
 }
 
-// Use only the 5 standard categories
-const categories = ['Health', 'Strength', 'Mind', 'Work', 'Spirit'];
+// Use categories from centralized manager (task type)
 
 const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
   const [formData, setFormData] = useState({
@@ -84,12 +84,17 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
   };
 
   const handleCategoryToggle = (category: string) => {
-    setFormData(prev => ({
-      ...prev,
-      categories: prev.categories.includes(category)
-        ? prev.categories.filter(c => c !== category)
-        : [...prev.categories, category]
-    }));
+    setFormData(prev => {
+      const isSelected = prev.categories.includes(category);
+      if (isSelected) {
+        return { ...prev, categories: prev.categories.filter(c => c !== category) };
+      }
+      if (prev.categories.length >= 5) {
+        alert('You can select up to 5 categories for tasks.');
+        return prev;
+      }
+      return { ...prev, categories: [...prev.categories, category] };
+    });
   };
 
   const handlePointsChange = (category: string, points: number) => {
@@ -101,6 +106,10 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
       }
     }));
   };
+
+  // Pull task categories from centralized context
+  const { getByType } = useCategories();
+  const taskCategories = getByType('task').map(c => c.name);
 
   return (
     <Card className="p-6 shadow-medium">
@@ -176,7 +185,7 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
           <Label>Categories <span className="text-red-500">*</span></Label>
           <p className="text-xs text-gray-600">Select at least one category (defaults to "Work" if none selected)</p>
           <div className="grid grid-cols-2 gap-3">
-            {categories.map((category) => (
+            {(taskCategories.length ? taskCategories : ['Health','Strength','Mind','Work','Spirit']).map((category) => (
               <div
                 key={category}
                 className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${

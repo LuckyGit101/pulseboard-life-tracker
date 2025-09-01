@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { DollarSign, TrendingUp, Plus, Edit, Trash2, Calendar } from 'lucide-react';
 import { TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
+import { useCategories } from '@/contexts/CategoryContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { apiClient } from '@/lib/api';
 
 // Mock data
 const mockInvestments = [
@@ -20,7 +23,7 @@ const mockInvestments = [
   { id: '6', name: 'Bitcoin', amount: 15000, type: 'Crypto', date: '2024-07-10', return: -8.2 }
 ];
 
-const investmentTypes = ['Stocks', 'Mutual Funds', 'PPF', 'ELSS', 'Gold', 'Crypto', 'FD', 'Others'];
+// Investment types now come from centralized categories
 
 const getBreakdownData = () => {
   const breakdown: { [key: string]: number } = {};
@@ -52,7 +55,12 @@ const getPerformanceData = () => {
 };
 
 const InvestmentTrackerPage = () => {
+  const { isAuthenticated } = useAuth();
+  const { getByType } = useCategories();
+  const investmentCategories = getByType('investment');
   const [showForm, setShowForm] = useState(false);
+  const [investments, setInvestments] = useState<typeof mockInvestments>([]);
+  const [loading, setLoading] = useState(false);
   const [editingInvestment, setEditingInvestment] = useState<typeof mockInvestments[0] | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -61,10 +69,42 @@ const InvestmentTrackerPage = () => {
     date: new Date().toISOString().split('T')[0]
   });
 
-  const totalInvestment = mockInvestments.reduce((sum, inv) => sum + inv.amount, 0);
-  const totalReturn = mockInvestments.reduce((sum, inv) => sum + (inv.amount * inv.return / 100), 0);
+  // Load investments based on authentication status
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadInvestments();
+    } else {
+      // Load mock data for demo mode
+      loadMockInvestments();
+    }
+  }, [isAuthenticated]);
+
+  const loadMockInvestments = () => {
+    console.log('Loading mock investments for demo mode...');
+    setInvestments(mockInvestments);
+    console.log('Mock investments loaded:', mockInvestments.length, 'investments');
+  };
+
+  const loadInvestments = async () => {
+    setLoading(true);
+    try {
+      console.log('Loading investments from API...');
+      const apiInvestments = await apiClient.getInvestments();
+      console.log('Loaded investments:', apiInvestments);
+      setInvestments(apiInvestments);
+    } catch (error) {
+      console.error('Error loading investments:', error);
+      // On error, set empty array
+      setInvestments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalInvestment = investments.reduce((sum, inv) => sum + inv.amount, 0);
+  const totalReturn = investments.reduce((sum, inv) => sum + (inv.amount * inv.return / 100), 0);
   const totalValue = totalInvestment + totalReturn;
-  const overallReturn = ((totalValue - totalInvestment) / totalInvestment) * 100;
+  const overallReturn = totalInvestment > 0 ? ((totalValue - totalInvestment) / totalInvestment) * 100 : 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,6 +156,26 @@ const InvestmentTrackerPage = () => {
             <p className={TYPOGRAPHY.bodyText}>Track your investment portfolio</p>
           </div>
         </div>
+
+        {/* Demo Mode Notice */}
+        {!isAuthenticated && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-white text-xs font-bold">i</span>
+              </div>
+              <div>
+                <h4 className="font-medium text-blue-900 mb-1">Demo Mode</h4>
+                <p className="text-sm text-blue-700 mb-2">
+                  You're currently viewing mock data. Investments shown are demo data and cannot be edited or deleted.
+                </p>
+                <p className="text-sm text-blue-700">
+                  <strong>To create and manage real investments:</strong> Sign in to your account and create new investments. Real investments will have unique IDs and can be fully edited.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Total Portfolio Value */}
         <Card className={LAYOUT.standardCard}>
@@ -211,9 +271,12 @@ const InvestmentTrackerPage = () => {
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {investmentTypes.map(type => (
-                        <SelectItem key={type} value={type}>
-                          {type}
+                      {investmentCategories.map(cat => (
+                        <SelectItem key={cat.id} value={cat.name}>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color || '#94a3b8' }} />
+                            {cat.name}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -308,7 +371,7 @@ const InvestmentTrackerPage = () => {
           </div>
 
           <div className="space-y-3">
-            {mockInvestments.map((investment) => (
+            {investments.map((investment) => (
               <div key={investment.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
