@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,35 +9,45 @@ import { Badge } from '@/components/ui/badge';
 import ToggleTabs from '@/components/ui/toggle-tabs';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { DollarSign, TrendingDown, TrendingUp, Plus, Calendar, Home, Car, Heart, Zap, User, Utensils, PiggyBank, Clock } from 'lucide-react';
-import { mockExpenses, mockIncome, trendData } from '@/data/mockData';
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
+import { TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
 import { apiClient, Expense } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCategories } from '@/contexts/CategoryContext';
 
 // Debug logging to check data
-console.log('ExpenseTrackerPage - expenseData:', mockExpenses);
-console.log('ExpenseTrackerPage - incomeData:', mockIncome);
+console.log('ExpenseTrackerPage - expenseData:', []);
+console.log('ExpenseTrackerPage - incomeData:', []);
 
-// Fallback data in case imports fail
-const fallbackExpenseData = [
-  { id: 'fallback1', name: 'Sample Expense', amount: 1000, category: 'Food', date: '2025-07-28', isRecurring: false }
+// Empty data structures for when no data is available
+const emptyExpenseData = [];
+const emptyIncomeData = [];
+const emptyTrendData = [
+  { month: 'Jan', income: 0, expenses: 0, investments: 0, tasks: 0 },
+  { month: 'Feb', income: 0, expenses: 0, investments: 0, tasks: 0 },
+  { month: 'Mar', income: 0, expenses: 0, investments: 0, tasks: 0 },
+  { month: 'Apr', income: 0, expenses: 0, investments: 0, tasks: 0 },
+  { month: 'May', income: 0, expenses: 0, investments: 0, tasks: 0 },
+  { month: 'Jun', income: 0, expenses: 0, investments: 0, tasks: 0 }
 ];
 
-const fallbackIncomeData = [
-  { id: 'fallback2', name: 'Sample Income', amount: 5000, category: 'Salary', date: '2025-07-28', isRecurring: false }
+// Empty expense breakdown for charts
+const emptyExpenseBreakdown = [
+  { name: 'Food', value: 0, color: '#10b981' },
+  { name: 'Transport', value: 0, color: '#3b82f6' },
+  { name: 'Shopping', value: 0, color: '#8b5cf6' },
+  { name: 'Utilities', value: 0, color: '#f59e0b' },
+  { name: 'Entertainment', value: 0, color: '#ef4444' },
+  { name: 'Health', value: 0, color: '#06b6d4' }
 ];
 
-const mockExpenseBreakdown = [
-  { name: 'Housing', value: 1200, color: 'hsl(var(--chart-1))' },
-  { name: 'Food', value: 135, color: 'hsl(var(--chart-2))' },
-  { name: 'Health', value: 50, color: 'hsl(var(--chart-3))' },
-  { name: 'Transportation', value: 0, color: 'hsl(var(--chart-4))' },
-  { name: 'Entertainment', value: 0, color: 'hsl(var(--chart-5))' }
-];
-
-// Use standardized expense categories
-const categories = Object.keys(EXPENSE_CATEGORIES);
+// Income categories
+const INCOME_CATEGORIES = {
+  'Salary': { name: 'Salary', color: '#10b981' },
+  'Freelance': { name: 'Freelance', color: '#3b82f6' },
+  'Investment': { name: 'Investment', color: '#8b5cf6' },
+  'Business': { name: 'Business', color: '#f59e0b' },
+  'Other': { name: 'Other', color: '#ef4444' }
+};
 
 const ExpenseTrackerPage = () => {
   const { isAuthenticated } = useAuth();
@@ -72,34 +82,10 @@ const ExpenseTrackerPage = () => {
   }, [isAuthenticated]);
 
   const loadMockExpenses = () => {
-    console.log('Loading mock expenses for demo mode...');
-    // Set some mock expenses for demo
-    const mockExpenses = [
-      {
-        id: 'mock-1',
-        userId: 'mock',
-        name: 'Grocery Shopping',
-        amount: 2500,
-        category: 'Food',
-        date: '2025-08-24',
-        isRecurring: false,
-        createdAt: '2025-08-24T10:00:00Z',
-        updatedAt: '2025-08-24T10:00:00Z'
-      },
-      {
-        id: 'mock-2',
-        userId: 'mock',
-        name: 'Fuel',
-        amount: 1200,
-        category: 'Transport',
-        date: '2025-08-23',
-        isRecurring: false,
-        createdAt: '2025-08-23T15:30:00Z',
-        updatedAt: '2025-08-23T15:30:00Z'
-      }
-    ];
-    setExpenses(mockExpenses);
-    console.log('Mock expenses loaded:', mockExpenses.length, 'expenses');
+    console.log('Loading empty expenses for demo mode...');
+    // Set empty expenses for demo
+    setExpenses([]);
+    console.log('Empty expenses loaded: 0 expenses');
   };
 
   const loadExpenses = async () => {
@@ -345,8 +331,8 @@ const ExpenseTrackerPage = () => {
 
   // Filter data based on current filters - use real expenses when authenticated, fallback to mock
   const currentData = entryType === 'expense' 
-    ? (isAuthenticated && expenses.length > 0 ? expenses : (mockExpenses || fallbackExpenseData))
-    : (mockIncome || fallbackIncomeData); // For now, income still uses mock data
+    ? (isAuthenticated && expenses.length > 0 ? expenses : emptyExpenseData)
+    : (emptyIncomeData); // For now, income still uses mock data
   
   console.log('ExpenseTrackerPage - currentData:', currentData, 'entryType:', entryType, 'isAuthenticated:', isAuthenticated);
   console.log('ExpenseTrackerPage - expenses from API:', expenses);
@@ -497,6 +483,10 @@ const ExpenseTrackerPage = () => {
     }
   };
 
+  // Chart data
+  const chartData = emptyTrendData;
+  const expenseBreakdown = emptyExpenseBreakdown;
+
   return (
     <div className="min-h-screen bg-white bg-gradient-to-b from-[#f5f6fa] to-[#e9eafc] p-6 lg:p-10">
       <div className="container mx-auto max-w-7xl space-y-6">
@@ -518,7 +508,7 @@ const ExpenseTrackerPage = () => {
               <div>
                 <h4 className="font-medium text-blue-900 mb-1">Demo Mode</h4>
                 <p className="text-sm text-blue-700 mb-2">
-                  You're currently viewing mock data. Expenses with IDs starting with "mock-" are demo data and cannot be edited or deleted.
+                  You're currently viewing empty data. No expenses are available in demo mode.
                 </p>
                 <p className="text-sm text-blue-700">
                   <strong>To create and manage real expenses:</strong> Sign in to your account and create new expenses. Real expenses will have unique IDs and can be fully edited.

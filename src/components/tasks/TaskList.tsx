@@ -220,23 +220,12 @@ const TaskList = ({
                       </div>
 
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        {/* Show mock task indicator */}
-                        {task.id && task.id.length < 10 && (
-                          <Badge variant="outline" className="text-xs text-muted-foreground">
-                            Mock
-                          </Badge>
-                        )}
-                        
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => onTaskEdit(task)}
-                          disabled={task.id && task.id.length < 10} // Disable for mock tasks
-                          className={cn(
-                            "h-8 w-8 p-0",
-                            task.id && task.id.length < 10 && "opacity-50 cursor-not-allowed"
-                          )}
-                          title={task.id && task.id.length < 10 ? "Cannot edit mock task" : "Edit task"}
+                          className="text-blue-600 hover:bg-blue-50"
+                          title="Edit task"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -244,12 +233,8 @@ const TaskList = ({
                           variant="ghost"
                           size="sm"
                           onClick={() => onTaskDelete(task.id)}
-                          disabled={task.id && task.id.length < 10} // Disable for mock tasks
-                          className={cn(
-                            "h-8 w-8 p-0 text-destructive hover:text-destructive",
-                            task.id && task.id.length < 10 && "opacity-50 cursor-not-allowed"
-                          )}
-                          title={task.id && task.id.length < 10 ? "Cannot delete mock task" : "Delete task"}
+                          className="text-red-600 hover:bg-red-50"
+                          title="Delete task"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

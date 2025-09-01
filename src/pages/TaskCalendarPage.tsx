@@ -10,555 +10,8 @@ import { STANDARD_CATEGORIES, TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
 import { apiClient, Task } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Mock data - Updated to use only 5 standard categories
-const mockTasks = [
-  // August 24, 2025 - Main day with many tasks (matching the selected date)
-  {
-    id: '1',
-    title: 'Morning Workout',
-    description: 'Full body home workout',
-    date: '2025-08-24',
-    categories: ['Health', 'Strength'],
-    duration: 45,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    repeatCount: 30,
-    points: { Health: 1, Strength: 1 }
-  },
-  {
-    id: '2',
-    title: 'Repeating Daily',
-    description: 'Daily routine task',
-    date: '2025-08-24',
-    categories: ['Work'],
-    duration: 20,
-    completed: true,
-    repeatFrequency: 'daily' as const,
-    points: { Work: 1 }
-  },
-  {
-    id: '3',
-    title: 'Learn React',
-    description: 'Study modern React patterns',
-    date: '2025-08-24',
-    categories: ['Mind'],
-    duration: 60,
-    completed: false,
-    points: { Mind: 2 }
-  },
-  {
-    id: '4',
-    title: 'Gym',
-    description: 'Daily gym session with weights and cardio',
-    date: '2025-08-24',
-    categories: ['Health', 'Strength'],
-    duration: 90,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 2, Strength: 2 }
-  },
-  {
-    id: '5',
-    title: 'Get Ready',
-    description: 'Morning routine - shower, dress, breakfast',
-    date: '2025-08-24',
-    categories: ['Health'],
-    duration: 30,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 1 }
-  },
-  {
-    id: '6',
-    title: 'Eat 200 calories',
-    description: 'Track daily calorie intake',
-    date: '2025-08-24',
-    categories: ['Health'],
-    duration: 0,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 2 },
-    targetValue: 200,
-    currentValue: 100,
-    unit: 'cal',
-    isProgressTask: true
-  },
-  {
-    id: '7',
-    title: 'Read Programming Book',
-    description: 'Study advanced JavaScript concepts',
-    date: '2025-08-24',
-    categories: ['Mind'],
-    duration: 45,
-    completed: false,
-    points: { Mind: 3 }
-  },
-  {
-    id: '8',
-    title: 'Team Meeting',
-    description: 'Daily standup with development team',
-    date: '2025-08-24',
-    categories: ['Work'],
-    duration: 30,
-    completed: true,
-    points: { Work: 1 }
-  },
-  {
-    id: '9',
-    title: 'Meditation',
-    description: 'Evening mindfulness practice',
-    date: '2025-08-24',
-    categories: ['Spirit'],
-    duration: 20,
-    completed: false,
-    points: { Spirit: 1 }
-  },
-  {
-    id: '10',
-    title: 'Code Review',
-    description: 'Review pull requests from team members',
-    date: '2025-08-24',
-    categories: ['Work', 'Mind'],
-    duration: 60,
-    completed: false,
-    points: { Work: 2, Mind: 1 }
-  },
-
-  // August 25, 2025 - Another day with tasks
-  {
-    id: '11',
-    title: 'Gym',
-    description: 'Daily gym session with weights and cardio',
-    date: '2025-08-25',
-    categories: ['Health', 'Strength'],
-    duration: 90,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 2, Strength: 2 }
-  },
-  {
-    id: '12',
-    title: 'Get Ready',
-    description: 'Morning routine - shower, dress, breakfast',
-    date: '2025-08-25',
-    categories: ['Health'],
-    duration: 30,
-    completed: true,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 1 }
-  },
-  {
-    id: '13',
-    title: 'Eat 200 calories',
-    description: 'Track daily calorie intake',
-    date: '2025-08-25',
-    categories: ['Health'],
-    duration: 0,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 2 },
-    targetValue: 200,
-    currentValue: 150,
-    unit: 'cal',
-    isProgressTask: true
-  },
-  {
-    id: '14',
-    title: 'Client Presentation',
-    description: 'Present quarterly results to client',
-    date: '2025-08-25',
-    categories: ['Work'],
-    duration: 120,
-    completed: false,
-    points: { Work: 4 }
-  },
-  {
-    id: '15',
-    title: 'Yoga Session',
-    description: 'Evening yoga for flexibility',
-    date: '2025-08-25',
-    categories: ['Health', 'Spirit'],
-    duration: 60,
-    completed: false,
-    points: { Health: 2, Spirit: 2 }
-  },
-
-  // August 26, 2025
-  {
-    id: '16',
-    title: 'Gym',
-    description: 'Daily gym session with weights and cardio',
-    date: '2025-08-26',
-    categories: ['Health', 'Strength'],
-    duration: 90,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 2, Strength: 2 }
-  },
-  {
-    id: '17',
-    title: 'Get Ready',
-    description: 'Morning routine - shower, dress, breakfast',
-    date: '2025-08-26',
-    categories: ['Health'],
-    duration: 30,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 1 }
-  },
-  {
-    id: '18',
-    title: 'Eat 200 calories',
-    description: 'Track daily calorie intake',
-    date: '2025-08-26',
-    categories: ['Health'],
-    duration: 0,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 2 },
-    targetValue: 200,
-    currentValue: 75,
-    unit: 'cal',
-    isProgressTask: true
-  },
-  {
-    id: '19',
-    title: 'Database Optimization',
-    description: 'Optimize application database queries',
-    date: '2025-08-26',
-    categories: ['Work', 'Mind'],
-    duration: 180,
-    completed: false,
-    points: { Work: 3, Mind: 2 }
-  },
-  {
-    id: '20',
-    title: 'Book Reading',
-    description: 'Read Atomic Habits',
-    date: '2025-08-26',
-    categories: ['Mind', 'Spirit'],
-    duration: 45,
-    completed: false,
-    points: { Mind: 2, Spirit: 1 }
-  },
-
-  // August 27, 2025
-  {
-    id: '21',
-    title: 'Gym',
-    description: 'Daily gym session with weights and cardio',
-    date: '2025-08-27',
-    categories: ['Health', 'Strength'],
-    duration: 90,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 2, Strength: 2 }
-  },
-  {
-    id: '22',
-    title: 'Get Ready',
-    description: 'Morning routine - shower, dress, breakfast',
-    date: '2025-08-27',
-    categories: ['Health'],
-    duration: 30,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 1 }
-  },
-  {
-    id: '23',
-    title: 'Eat 200 calories',
-    description: 'Track daily calorie intake',
-    date: '2025-08-27',
-    categories: ['Health'],
-    duration: 0,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 2 },
-    targetValue: 200,
-    currentValue: 0,
-    unit: 'cal',
-    isProgressTask: true
-  },
-  {
-    id: '24',
-    title: 'Swimming',
-    description: 'Swimming practice at club',
-    date: '2025-08-27',
-    categories: ['Health'],
-    duration: 60,
-    completed: false,
-    points: { Health: 3 }
-  },
-  {
-    id: '25',
-    title: 'Learn React Native',
-    description: 'Study mobile app development',
-    date: '2025-08-27',
-    categories: ['Mind'],
-    duration: 120,
-    completed: false,
-    points: { Mind: 4 }
-  },
-
-  // August 28, 2025
-  {
-    id: '26',
-    title: 'Gym',
-    description: 'Daily gym session with weights and cardio',
-    date: '2025-08-28',
-    categories: ['Health', 'Strength'],
-    duration: 90,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 2, Strength: 2 }
-  },
-  {
-    id: '27',
-    title: 'Get Ready',
-    description: 'Morning routine - shower, dress, breakfast',
-    date: '2025-08-28',
-    categories: ['Health'],
-    duration: 30,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 1 }
-  },
-  {
-    id: '28',
-    title: 'Eat 200 calories',
-    description: 'Track daily calorie intake',
-    date: '2025-08-28',
-    categories: ['Health'],
-    duration: 0,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 2 },
-    targetValue: 200,
-    currentValue: 50,
-    unit: 'cal',
-    isProgressTask: true
-  },
-  {
-    id: '29',
-    title: 'Project Planning',
-    description: 'Plan next quarter objectives',
-    date: '2025-08-28',
-    categories: ['Work'],
-    duration: 90,
-    completed: false,
-    points: { Work: 3 }
-  },
-  {
-    id: '30',
-    title: 'Friend Meetup',
-    description: 'Dinner with college friends',
-    date: '2025-08-28',
-    categories: ['Spirit'],
-    duration: 180,
-    completed: false,
-    points: { Spirit: 3 }
-  },
-
-  // August 29, 2025
-  {
-    id: '31',
-    title: 'Gym',
-    description: 'Daily gym session with weights and cardio',
-    date: '2025-08-29',
-    categories: ['Health', 'Strength'],
-    duration: 90,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 2, Strength: 2 }
-  },
-  {
-    id: '32',
-    title: 'Get Ready',
-    description: 'Morning routine - shower, dress, breakfast',
-    date: '2025-08-29',
-    categories: ['Health'],
-    duration: 30,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 1 }
-  },
-  {
-    id: '33',
-    title: 'Eat 200 calories',
-    description: 'Track daily calorie intake',
-    date: '2025-08-29',
-    categories: ['Health'],
-    duration: 0,
-    completed: false,
-    repeatFrequency: 'daily' as const,
-    points: { Health: 2 },
-    targetValue: 200,
-    currentValue: 25,
-    unit: 'cal',
-    isProgressTask: true
-  },
-  {
-    id: '34',
-    title: 'Evening Run',
-    description: 'Cardio session in the park',
-    date: '2025-08-29',
-    categories: ['Health'],
-    duration: 30,
-    completed: false,
-    points: { Health: 2 }
-  },
-  {
-    id: '35',
-    title: 'Grocery Shopping',
-    description: 'Weekly grocery run',
-    date: '2025-08-29',
-    categories: ['Work'],
-    duration: 60,
-    completed: false,
-    points: { Work: 1 }
-  },
-
-  // August 17, 2025 - Current selected date
-  {
-    id: '36',
-    title: 'Morning Exercise',
-    description: 'Quick morning workout',
-    date: '2025-08-17',
-    categories: ['Health'],
-    duration: 30,
-    completed: false,
-    points: { Health: 2 }
-  },
-  {
-    id: '37',
-    title: 'Work Meeting',
-    description: 'Team sync meeting',
-    date: '2025-08-17',
-    categories: ['Work'],
-    duration: 60,
-    completed: true,
-    points: { Work: 1 }
-  },
-
-  // August 18, 2025
-  {
-    id: '38',
-    title: 'Gym Session',
-    description: 'Full body workout',
-    date: '2025-08-18',
-    categories: ['Health', 'Strength'],
-    duration: 90,
-    completed: false,
-    points: { Health: 2, Strength: 2 }
-  },
-  {
-    id: '39',
-    title: 'Code Review',
-    description: 'Review team PRs',
-    date: '2025-08-18',
-    categories: ['Work', 'Mind'],
-    duration: 45,
-    completed: false,
-    points: { Work: 2, Mind: 1 }
-  },
-
-  // August 19, 2025
-  {
-    id: '40',
-    title: 'Yoga Class',
-    description: 'Evening yoga session',
-    date: '2025-08-19',
-    categories: ['Health', 'Spirit'],
-    duration: 60,
-    completed: false,
-    points: { Health: 2, Spirit: 2 }
-  },
-  {
-    id: '41',
-    title: 'Reading Time',
-    description: 'Read technical articles',
-    date: '2025-08-19',
-    categories: ['Mind'],
-    duration: 30,
-    completed: false,
-    points: { Mind: 2 }
-  },
-
-     // August 20, 2025
-   {
-     id: '42',
-     title: 'Swimming',
-     description: 'Pool workout',
-     date: '2025-08-20',
-     categories: ['Health'],
-     duration: 45,
-     completed: false,
-     points: { Health: 3 }
-   },
-   {
-     id: '43',
-     title: 'Project Planning',
-     description: 'Plan next sprint',
-     date: '2025-08-20',
-     categories: ['Work'],
-     duration: 120,
-     completed: false,
-     points: { Work: 3 }
-   },
-
-   // Tasks without dates (for "Tasks" view)
-   {
-     id: '44',
-     title: 'Get New Shoes',
-     description: 'Buy new running shoes',
-     date: undefined,
-     categories: ['Health'],
-     duration: 60,
-     completed: false,
-     points: { Health: 2 }
-   },
-   {
-     id: '45',
-     title: 'Read Programming Book',
-     description: 'Finish reading Clean Code',
-     date: undefined,
-     categories: ['Mind'],
-     duration: 90,
-     completed: false,
-     points: { Mind: 3 }
-   },
-   {
-     id: '46',
-     title: 'Organize Desk',
-     description: 'Clean and organize workspace',
-     date: undefined,
-     categories: ['Work'],
-     duration: 30,
-     completed: true,
-     points: { Work: 1 }
-   },
-   {
-     id: '47',
-     title: 'Call Mom',
-     description: 'Weekly call with family',
-     date: undefined,
-     categories: ['Spirit'],
-     duration: 20,
-     completed: false,
-     points: { Spirit: 2 }
-   },
-   {
-     id: '48',
-     title: 'Learn Guitar',
-     description: 'Practice guitar for 30 minutes',
-     date: undefined,
-     categories: ['Mind', 'Spirit'],
-     duration: 30,
-     completed: false,
-     points: { Mind: 2, Spirit: 1 }
-   }
- ];
+// Empty tasks array for when no data is available
+const emptyTasks = [];
 
 // Transform backend points to frontend format (capitalize keys)
 const transformPointsToFrontend = (points: Record<string, number> | undefined): Record<string, number> => {
@@ -574,7 +27,7 @@ const transformPointsToFrontend = (points: Record<string, number> | undefined): 
 };
 
 // Transform API Task to match UI expectations
-const transformApiTask = (task: Task | any): typeof mockTasks[0] => {
+const transformApiTask = (task: Task | any): typeof emptyTasks[0] => {
   // Handle both regular tasks and recurring instances
   const isRecurringInstance = task.recurringId || task.id?.startsWith('recurring_');
   
@@ -610,10 +63,10 @@ const TaskCalendarPage = () => {
   const [calendarView, setCalendarView] = useState<'monthly' | 'weekly'>('monthly');
   const [taskView, setTaskView] = useState<'daily' | 'weekly' | 'tasks'>('daily');
   const [selectedDate, setSelectedDate] = useState(new Date(2025, 7, 24)); // August 24, 2025 (where the recurring task was created)
-  const [tasks, setTasks] = useState<typeof mockTasks>([]); // Start empty, load based on auth status
+  const [tasks, setTasks] = useState<typeof emptyTasks>([]); // Start empty, load based on auth status
   const [loading, setLoading] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
-  const [editingTask, setEditingTask] = useState<typeof mockTasks[0] | undefined>();
+  const [editingTask, setEditingTask] = useState<typeof emptyTasks[0] | undefined>();
 
   // Load tasks based on authentication status
   useEffect(() => {
@@ -626,30 +79,9 @@ const TaskCalendarPage = () => {
   }, [isAuthenticated, selectedDate, taskView]);
 
   const loadMockTasks = () => {
-    console.log('Loading mock tasks for demo mode...');
-    
-    let mockFilteredTasks;
-    if (taskView === 'tasks') {
-      // For "Other Tasks" view, show all tasks without dates
-      mockFilteredTasks = mockTasks.filter(task => !task.date);
-    } else if (taskView === 'weekly') {
-      // For weekly view, filter mock data by week range
-      const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
-      const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 });
-      
-      mockFilteredTasks = mockTasks.filter(task => {
-        if (!task.date) return false;
-        const taskDate = new Date(task.date);
-        return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
-      });
-    } else {
-      // For daily view, filter mock data by selected date
-      const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
-      mockFilteredTasks = mockTasks.filter(task => task.date === selectedDateStr);
-    }
-    
-    setTasks(mockFilteredTasks);
-    console.log('Mock tasks loaded:', mockFilteredTasks.length, 'tasks');
+    console.log('Loading empty tasks for demo mode...');
+    setTasks([]);
+    console.log('Empty tasks loaded: 0 tasks');
   };
 
   const loadTasks = async () => {
@@ -753,7 +185,7 @@ const TaskCalendarPage = () => {
     }
   };
 
-  const handleTaskEdit = (task: typeof mockTasks[0]) => {
+  const handleTaskEdit = (task: typeof emptyTasks[0]) => {
     // Check if this is a mock task (has simple ID like '1', '2', '3')
     if (task.id && task.id.length < 10) {
       console.log('Cannot edit mock task:', task.id);
@@ -903,28 +335,29 @@ const TaskCalendarPage = () => {
           </div>
         </div>
 
+        {/* Demo Mode Notice */}
+        {!isAuthenticated && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-white text-xs font-bold">i</span>
+              </div>
+              <div>
+                <h4 className="font-medium text-blue-900 mb-1">Demo Mode</h4>
+                <p className="text-sm text-blue-700 mb-2">
+                  You're currently viewing empty data. No tasks are available in demo mode.
+                </p>
+                <p className="text-sm text-blue-700">
+                  <strong>To create and manage real tasks:</strong> Sign in to your account and create new tasks. Real tasks will have unique IDs and can be fully edited.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Calendar Section */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Mock Data Notice */}
-            {!isAuthenticated && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-white text-xs font-bold">i</span>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-blue-900 mb-1">Demo Mode</h4>
-                    <p className="text-sm text-blue-700 mb-2">
-                      You're currently viewing mock data. Tasks with simple IDs (1, 2, 3...) are demo tasks and cannot be edited or deleted.
-                    </p>
-                    <p className="text-sm text-blue-700">
-                      <strong>To create and manage real tasks:</strong> Sign in to your account and create new tasks. Real tasks will have unique IDs and can be fully edited.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
             
             {/* Calendar View Toggle */}
             <div className="flex justify-end">

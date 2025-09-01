@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { userData } from '@/data/mockData';
 import { config } from '@/lib/config';
 import { apiClient, User } from '@/lib/api';
 

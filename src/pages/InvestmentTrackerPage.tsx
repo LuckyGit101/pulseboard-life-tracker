@@ -13,44 +13,30 @@ import { useCategories } from '@/contexts/CategoryContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 
-// Mock data
-const mockInvestments = [
-  { id: '1', name: 'Nifty 50 Index Fund', amount: 125000, type: 'Stocks', date: '2024-05-01', return: 15.2 },
-  { id: '2', name: 'SBI Bluechip Fund', amount: 85000, type: 'Mutual Funds', date: '2024-05-15', return: 18.3 },
-  { id: '3', name: 'PPF Account', amount: 45000, type: 'PPF', date: '2024-06-01', return: 8.1 },
-  { id: '4', name: 'ELSS Tax Saver', amount: 30000, type: 'ELSS', date: '2024-06-15', return: 22.5 },
-  { id: '5', name: 'Gold ETF', amount: 20000, type: 'Gold', date: '2024-07-01', return: 12.7 },
-  { id: '6', name: 'Bitcoin', amount: 15000, type: 'Crypto', date: '2024-07-10', return: -8.2 }
-];
+// Empty investment data
+const emptyInvestments = [];
 
-// Investment types now come from centralized categories
-
-const getBreakdownData = () => {
-  const breakdown: { [key: string]: number } = {};
-  mockInvestments.forEach(investment => {
-    breakdown[investment.type] = (breakdown[investment.type] || 0) + investment.amount;
-  });
+// Calculate portfolio metrics from empty data
+const calculatePortfolioMetrics = (investments: typeof emptyInvestments) => {
+  const totalInvestment = investments.reduce((sum, inv) => sum + inv.amount, 0);
+  const totalReturn = investments.reduce((sum, inv) => sum + (inv.amount * inv.return / 100), 0);
+  const totalValue = totalInvestment + totalReturn;
+  const overallReturn = totalInvestment > 0 ? ((totalValue - totalInvestment) / totalInvestment) * 100 : 0;
   
-  const colors = [
-    'hsl(var(--chart-1))',
-    'hsl(var(--chart-2))',
-    'hsl(var(--chart-3))',
-    'hsl(var(--chart-4))',
-    'hsl(var(--chart-5))'
-  ];
-  
-  return Object.entries(breakdown).map(([type, amount], index) => ({
-    name: type,
-    value: amount,
-    color: colors[index % colors.length]
-  }));
+  return {
+    totalInvestment,
+    totalReturn,
+    totalValue,
+    overallReturn
+  };
 };
 
-const getPerformanceData = () => {
-  return mockInvestments.map(investment => ({
-    name: investment.name.length > 10 ? investment.name.substring(0, 10) + '...' : investment.name,
-    return: investment.return,
-    amount: investment.amount
+// Get investment breakdown for charts
+const getInvestmentBreakdown = (investments: typeof emptyInvestments) => {
+  return investments.map(investment => ({
+    name: investment.name,
+    value: investment.amount,
+    return: investment.return
   }));
 };
 
@@ -59,9 +45,9 @@ const InvestmentTrackerPage = () => {
   const { getByType } = useCategories();
   const investmentCategories = getByType('investment');
   const [showForm, setShowForm] = useState(false);
-  const [investments, setInvestments] = useState<typeof mockInvestments>([]);
+  const [investments, setInvestments] = useState<typeof emptyInvestments>([]);
   const [loading, setLoading] = useState(false);
-  const [editingInvestment, setEditingInvestment] = useState<typeof mockInvestments[0] | null>(null);
+  const [editingInvestment, setEditingInvestment] = useState<typeof emptyInvestments[0] | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     amount: '',
@@ -80,9 +66,9 @@ const InvestmentTrackerPage = () => {
   }, [isAuthenticated]);
 
   const loadMockInvestments = () => {
-    console.log('Loading mock investments for demo mode...');
-    setInvestments(mockInvestments);
-    console.log('Mock investments loaded:', mockInvestments.length, 'investments');
+    console.log('Loading empty investments for demo mode...');
+    setInvestments(emptyInvestments);
+    console.log('Empty investments loaded: 0 investments');
   };
 
   const loadInvestments = async () => {
@@ -101,10 +87,7 @@ const InvestmentTrackerPage = () => {
     }
   };
 
-  const totalInvestment = investments.reduce((sum, inv) => sum + inv.amount, 0);
-  const totalReturn = investments.reduce((sum, inv) => sum + (inv.amount * inv.return / 100), 0);
-  const totalValue = totalInvestment + totalReturn;
-  const overallReturn = totalInvestment > 0 ? ((totalValue - totalInvestment) / totalInvestment) * 100 : 0;
+  const { totalInvestment, totalReturn, totalValue, overallReturn } = calculatePortfolioMetrics(investments);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,7 +103,7 @@ const InvestmentTrackerPage = () => {
     setEditingInvestment(null);
   };
 
-  const handleEdit = (investment: typeof mockInvestments[0]) => {
+  const handleEdit = (investment: typeof emptyInvestments[0]) => {
     setEditingInvestment(investment);
     setFormData({
       name: investment.name,
@@ -167,7 +150,7 @@ const InvestmentTrackerPage = () => {
               <div>
                 <h4 className="font-medium text-blue-900 mb-1">Demo Mode</h4>
                 <p className="text-sm text-blue-700 mb-2">
-                  You're currently viewing mock data. Investments shown are demo data and cannot be edited or deleted.
+                  You're currently viewing empty data. No investments are available in demo mode.
                 </p>
                 <p className="text-sm text-blue-700">
                   <strong>To create and manage real investments:</strong> Sign in to your account and create new investments. Real investments will have unique IDs and can be fully edited.
@@ -318,18 +301,18 @@ const InvestmentTrackerPage = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={getBreakdownData()}
+                    data={getInvestmentBreakdown(investments)}
                     cx="50%"
                     cy="50%"
                     outerRadius={80}
                     dataKey="value"
                     label={({ name, value }) => `${name}: $${value.toLocaleString()}`}
                   >
-                    {getBreakdownData().map((entry, index) => (
+                    {getInvestmentBreakdown(investments).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Amount']} />
+                  <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -341,7 +324,7 @@ const InvestmentTrackerPage = () => {
           <h3 className="text-lg font-semibold mb-6 text-foreground">Investment Performance</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={getPerformanceData()}>
+              <BarChart data={getInvestmentBreakdown(investments)}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />

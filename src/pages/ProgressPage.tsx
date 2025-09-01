@@ -12,125 +12,36 @@ import { useCategories } from '@/contexts/CategoryContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 
-// Mock data - Updated to use only 5 standard categories
-const stats = [
-  { name: 'Health', current: 82, max: 100, color: 'health' as const },
-  { name: 'Strength', current: 71, max: 100, color: 'strength' as const },
-  { name: 'Mind', current: 89, max: 100, color: 'mind' as const },
-  { name: 'Work', current: 94, max: 100, color: 'work' as const },
-  { name: 'Spirit', current: 68, max: 100, color: 'spirit' as const }
+// Empty stats data for when no data is available
+const emptyStats = [
+  { name: 'Health', current: 0, max: 100, color: 'health' as const },
+  { name: 'Strength', current: 0, max: 100, color: 'strength' as const },
+  { name: 'Mind', current: 0, max: 100, color: 'mind' as const },
+  { name: 'Work', current: 0, max: 100, color: 'work' as const },
+  { name: 'Spirit', current: 0, max: 100, color: 'spirit' as const }
 ];
 
-// Mock user data
-const mockUser = {
-  name: 'Rahul Sharma',
-  email: 'rahul.sharma@gmail.com',
+// Empty user data
+const emptyUser = {
+  name: '',
+  email: '',
   avatar: '',
-  joinDate: '2024-01-15',
-  age: 24,
-  gender: 'Male',
-  timezone: 'Asia/Kolkata',
-  totalTasks: 387,
-  completedTasks: 312,
-  level: 18,
-  monthlyIncome: 140000,
-  location: 'Bangalore'
+  joinDate: '',
+  age: 0,
+  gender: '',
+  timezone: '',
+  totalTasks: 0,
+  completedTasks: 0,
+  level: 0,
+  monthlyIncome: 0,
+  location: ''
 };
 
-// Enhanced goals data with points and completion status
-const mockGoals = [
-  {
-    id: '1',
-    title: 'July Health Boost',
-    description: 'Complete 30 health-related tasks',
-    completed: true,
-    startDate: '2025-07-01',
-    endDate: '2025-07-31',
-    categories: { Health: 30 },
-    totalPoints: 30,
-    currentPoints: 30
-  },
-  {
-    id: '2',
-    title: 'Summer Fitness',
-    description: 'Build strength and endurance',
-    completed: false,
-    startDate: '2025-07-01',
-    endDate: '2025-08-31',
-    categories: { Health: 25, Strength: 35 },
-    totalPoints: 60,
-    currentPoints: 45
-  },
-  {
-    id: '3',
-    title: 'Mindfulness Journey',
-    description: 'Develop mental clarity and focus',
-    completed: false,
-    startDate: '2025-07-15',
-    endDate: '2025-09-15',
-    categories: { Mind: 40 },
-    totalPoints: 40,
-    currentPoints: 28
-  },
-  {
-    id: '4',
-    title: 'Personal Growth',
-    description: 'Advance career and spiritual development',
-    completed: true,
-    startDate: '2025-06-01',
-    endDate: '2025-08-31',
-    categories: { Work: 30, Spirit: 25 },
-    totalPoints: 55,
-    currentPoints: 55
-  },
-  {
-    id: '5',
-    title: 'Code Master Challenge',
-    description: 'Master React and TypeScript',
-    completed: false,
-    startDate: '2025-07-01',
-    endDate: '2025-10-31',
-    categories: { Mind: 50, Work: 40 },
-    totalPoints: 90,
-    currentPoints: 65
-  },
-  {
-    id: '6',
-    title: 'Spiritual Awakening',
-    description: 'Deepen spiritual practices',
-    completed: true,
-    startDate: '2025-06-15',
-    endDate: '2025-07-15',
-    categories: { Spirit: 35 },
-    totalPoints: 35,
-    currentPoints: 35
-  },
-  {
-    id: '7',
-    title: 'Physical Transformation',
-    description: 'Complete body transformation program',
-    completed: false,
-    startDate: '2025-07-01',
-    endDate: '2025-12-31',
-    categories: { Health: 40, Strength: 45 },
-    totalPoints: 85,
-    currentPoints: 52
-  },
-  {
-    id: '8',
-    title: 'Career Breakthrough',
-    description: 'Land a senior developer position',
-    completed: false,
-    startDate: '2025-07-01',
-    endDate: '2025-11-30',
-    categories: { Work: 60, Mind: 30 },
-    totalPoints: 90,
-    currentPoints: 38
-  }
-];
+// Empty goals data
+const emptyGoals = [];
 
 // Get recently completed goals for achievements
-const recentlyCompletedGoals = mockGoals
+const recentlyCompletedGoals = emptyGoals
   .filter(goal => goal.completed)
   .sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())
   .slice(0, 3);
@@ -252,7 +163,7 @@ const ProgressPage = () => {
   const [lineCustom, setLineCustom] = useState({ from: null, to: null });
   const [pieCustom, setPieCustom] = useState({ from: null, to: null });
   const [isCreatingGoal, setIsCreatingGoal] = useState(false);
-  const [goals, setGoals] = useState<typeof mockGoals>([]);
+  const [goals, setGoals] = useState<typeof emptyGoals>([]);
   const [loading, setLoading] = useState(false);
   const [goalForm, setGoalForm] = useState(() => {
     const initialCategories = taskCategories.reduce((acc, cat) => {
@@ -279,9 +190,9 @@ const ProgressPage = () => {
   }, [isAuthenticated]);
 
   const loadMockGoals = () => {
-    console.log('Loading mock goals for demo mode...');
-    setGoals(mockGoals);
-    console.log('Mock goals loaded:', mockGoals.length, 'goals');
+    console.log('Loading empty goals for demo mode...');
+    setGoals(emptyGoals);
+    console.log('Empty goals loaded: 0 goals');
   };
 
   const loadGoals = async () => {
@@ -419,7 +330,7 @@ const ProgressPage = () => {
               <div>
                 <h4 className="font-medium text-blue-900 mb-1">Demo Mode</h4>
                 <p className="text-sm text-blue-700 mb-2">
-                  You're currently viewing mock data. Goals and progress data shown are demo data and cannot be edited or deleted.
+                  You're currently viewing empty data. No goals or progress data are available in demo mode.
                 </p>
                 <p className="text-sm text-blue-700">
                   <strong>To create and manage real goals:</strong> Sign in to your account and create new goals. Real goals will have unique IDs and can be fully edited.
@@ -437,7 +348,7 @@ const ProgressPage = () => {
               Lifetime Stats Overview
             </h3>
             <div className="space-y-4 mb-6">
-              {stats.map((stat, idx) => (
+              {emptyStats.map((stat, idx) => (
                 <div key={stat.name} className="flex items-center gap-4">
                   <span className={`w-3 h-3 rounded-full mt-1 ${
                     stat.color === 'health' ? 'bg-green-500' :
@@ -466,7 +377,7 @@ const ProgressPage = () => {
             </div>
             <div className="flex items-center justify-between mt-6">
               <span className="font-bold text-lg">🏆 Total Points</span>
-              <span className="text-3xl font-extrabold text-violet-600 bg-violet-100 px-6 py-2 rounded-full shadow">145</span>
+              <span className="text-3xl font-extrabold text-violet-600 bg-violet-100 px-6 py-2 rounded-full shadow">0</span>
           </div>
         </Card>
 
