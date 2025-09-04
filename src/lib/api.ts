@@ -65,16 +65,39 @@ export interface Goal {
   id: string;
   userId: string;
   name: string;
-  description: string;
+  description?: string;
+  startDate?: string;
   targetDate: string;
   progress: number;
   status: 'active' | 'completed' | 'abandoned';
   category: string;
-  currentPoints: number;
-  totalPoints: number;
-  points: Record<string, number>;
+  targetValue?: number;
+  currentValue?: number;
+  points?: {
+    health?: number;
+    strength?: number;
+    mind?: number;
+    work?: number;
+    spirit?: number;
+  };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateGoalRequest {
+  name: string;
+  description?: string;
+  startDate?: string;
+  targetDate: string;
+  category: string;
+  targetValue?: number;
+  points?: {
+    health?: number;
+    strength?: number;
+    mind?: number;
+    work?: number;
+    spirit?: number;
+  };
 }
 
 export interface Expense {
@@ -179,12 +202,6 @@ class ApiClient {
       ...options.headers,
     };
 
-    console.log('API Request:', {
-      url,
-      method: options.method || 'GET',
-      headers,
-      body: options.body
-    });
 
     try {
       const response = await fetch(url, {
@@ -194,12 +211,6 @@ class ApiClient {
         credentials: 'omit', // Don't send cookies for cross-origin requests
       });
 
-      console.log('API Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        url: response.url,
-        headers: Object.fromEntries(response.headers.entries())
-      });
 
       // Handle CORS preflight errors
       if (response.status === 0) {
@@ -319,11 +330,16 @@ class ApiClient {
 
   // Goal Methods
   async listGoals(): Promise<Goal[]> {
-    const response = await this.request<Goal[]>('/goals');
-    return response.data!;
+    const response = await this.request<{ items: Goal[]; total: number; page: number; limit: number; hasMore: boolean }>('/goals');
+    return response.data?.items || [];
   }
 
-  async createGoal(goal: Omit<Goal, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<Goal> {
+  // Fix method name mismatch
+  async getGoals(): Promise<Goal[]> {
+    return this.listGoals();
+  }
+
+  async createGoal(goal: CreateGoalRequest): Promise<Goal> {
     const response = await this.request<Goal>('/goals', {
       method: 'POST',
       body: JSON.stringify(goal),
@@ -333,8 +349,16 @@ class ApiClient {
 
   async updateGoal(id: string, goal: Partial<Goal>): Promise<Goal> {
     const response = await this.request<Goal>(`/goals/${id}`, {
-      method: 'PUT',
+      method: 'PATCH', // Backend uses PATCH, not PUT
       body: JSON.stringify(goal),
+    });
+    return response.data!;
+  }
+
+  async updateGoalProgress(id: string, updates: Partial<Goal>): Promise<Goal> {
+    const response = await this.request<Goal>(`/goals/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
     });
     return response.data!;
   }
@@ -342,6 +366,12 @@ class ApiClient {
   async deleteGoal(id: string): Promise<void> {
     await this.request(`/goals/${id}`, {
       method: 'DELETE',
+    });
+  }
+
+  async syncGoalProgress(): Promise<void> {
+    await this.request('/goals/sync', {
+      method: 'POST',
     });
   }
 
@@ -426,23 +456,26 @@ class ApiClient {
   }
 
   // Points Methods
-  async getPointsSummary(params?: { startDate?: string; endDate?: string }): Promise<PointsSummary[]> {
-    const queryParams = new URLSearchParams();
-    if (params?.startDate) queryParams.append('startDate', params.startDate);
-    if (params?.endDate) queryParams.append('endDate', params.endDate);
-    
-    const endpoint = `/points${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    const response = await this.request<PointsSummary[]>(endpoint);
+  async getPointsSummary(params?: { period?: 'daily' | 'weekly' | 'monthly' | 'lifetime'; date_from?: string; date_to?: string }): Promise<PointsSummary> {
+    const qp = new URLSearchParams();
+    if (params?.period) qp.append('period', params.period);
+    if (params?.date_from) qp.append('date_from', params.date_from);
+    if (params?.date_to) qp.append('date_to', params.date_to);
+    const endpoint = `/points${qp.toString() ? `?${qp.toString()}` : ''}`;
+    console.log('[API] getPointsSummary endpoint:', endpoint);
+    const response = await this.request<PointsSummary>(endpoint);
+    console.log('[API] getPointsSummary response:', response);
     return response.data!;
   }
 
-  async getDailyCumulativePoints(params?: { startDate?: string; endDate?: string }): Promise<any> {
-    const queryParams = new URLSearchParams();
-    if (params?.startDate) queryParams.append('startDate', params.startDate);
-    if (params?.endDate) queryParams.append('endDate', params.endDate);
-    
-    const endpoint = `/points/daily-cumulative${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    const response = await this.request(endpoint);
+  async getDailyCumulative(params: { date_from: string; date_to: string }): Promise<{ series: Array<{ date: string; categories: Record<string, number>; total: number }> }> {
+    const qp = new URLSearchParams();
+    qp.append('date_from', params.date_from);
+    qp.append('date_to', params.date_to);
+    const endpoint = `/points/daily-cumulative?${qp.toString()}`;
+    console.log('[API] getDailyCumulative endpoint:', endpoint);
+    const response = await this.request<{ series: Array<{ date: string; categories: Record<string, number>; total: number }> }>(endpoint);
+    console.log('[API] getDailyCumulative response:', response);
     return response.data!;
   }
 
@@ -517,6 +550,22 @@ class ApiClient {
       method: 'DELETE',
       body: JSON.stringify({ filters }),
     });
+  }
+
+
+
+  // User Data Deletion
+  async deleteUserData(params: { mode: 'range' | 'all_keep_profile'; dateFrom?: string; dateTo?: string }): Promise<ApiResponse<{ totalDeleted: number; summary: any }>> {
+    const queryParams = new URLSearchParams();
+    queryParams.append('mode', params.mode);
+    if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
+    if (params.dateTo) queryParams.append('dateTo', params.dateTo);
+
+    const endpoint = `/user/data${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const response = await this.request<{ totalDeleted: number; summary: any }>(endpoint, {
+      method: 'DELETE',
+    });
+    return response;
   }
 }
 

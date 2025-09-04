@@ -67,10 +67,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     
     try {
-      console.log('Attempting login with:', { email, password: '***' });
       const response = await apiClient.signin({ email, password });
-      
-      console.log('Login successful:', { user: response.user, hasToken: !!response.accessToken });
       
       // Store tokens
       localStorage.setItem(config.auth.tokenKey, response.accessToken);
@@ -81,7 +78,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(false);
       return true;
     } catch (error) {
-      console.error('Login error:', error);
       setIsLoading(false);
       return false;
     }
@@ -91,15 +87,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     
     try {
-      console.log('Attempting signup with:', { 
-        name: userData.name, 
-        email: userData.email, 
-        password: '***' 
-      });
-      
       const response = await apiClient.signup(userData);
-      
-      console.log('Signup successful:', { user: response.user, hasToken: !!response.accessToken });
       
       // Store tokens
       localStorage.setItem(config.auth.tokenKey, response.accessToken);
@@ -110,7 +98,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsLoading(false);
       return true;
     } catch (error) {
-      console.error('Signup error:', error);
       setIsLoading(false);
       return false;
     }

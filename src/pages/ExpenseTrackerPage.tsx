@@ -14,9 +14,6 @@ import { apiClient, Expense } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCategories } from '@/contexts/CategoryContext';
 
-// Debug logging to check data
-console.log('ExpenseTrackerPage - expenseData:', []);
-console.log('ExpenseTrackerPage - incomeData:', []);
 
 // Empty data structures for when no data is available
 const emptyExpenseData = [];
@@ -82,22 +79,15 @@ const ExpenseTrackerPage = () => {
   }, [isAuthenticated]);
 
   const loadMockExpenses = () => {
-    console.log('Loading empty expenses for demo mode...');
-    // Set empty expenses for demo
     setExpenses([]);
-    console.log('Empty expenses loaded: 0 expenses');
   };
 
   const loadExpenses = async () => {
     setLoading(true);
     try {
-      console.log('Loading expenses from API...');
       const apiExpenses = await apiClient.getExpenses();
-      console.log('Loaded expenses:', apiExpenses);
       setExpenses(apiExpenses);
     } catch (error) {
-      console.error('Error loading expenses:', error);
-      // On error, set empty array instead of keeping existing data
       setExpenses([]);
     } finally {
       setLoading(false);

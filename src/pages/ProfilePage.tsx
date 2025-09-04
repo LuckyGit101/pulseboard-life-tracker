@@ -8,16 +8,25 @@ import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { User, Mail, Calendar, Settings, Globe, Download, Shield, LogOut, ArrowRight, Bell, Moon, Trash } from 'lucide-react';
+import { apiClient } from '@/lib/api';
 import { TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useCategories } from '@/contexts/CategoryContext';
+
 
 const ProfilePage = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { getByType, addCategory, updateCategory, deleteCategory, limits } = useCategories();
   const [colorModal, setColorModal] = useState<{ id: string; color: string } | null>(null);
+
+  const [showDeleteData, setShowDeleteData] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<'range' | 'all_keep_profile'>('range');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteResult, setDeleteResult] = useState<string | null>(null);
   
   const [userInfo, setUserInfo] = useState({
     name: user?.name || '',
@@ -37,7 +46,6 @@ const ProfilePage = () => {
   const [isEditing, setIsEditing] = useState(false);
 
   const handleSaveProfile = () => {
-    console.log('Save profile:', userInfo);
     setIsEditing(false);
   };
 
@@ -403,6 +411,18 @@ const ProfilePage = () => {
           </div>
 
           <div className="space-y-4">
+
+
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+              <div>
+                <div className="font-medium text-foreground">Delete My Data</div>
+                <div className="text-sm text-muted-foreground">
+                  Delete by date range or delete all data but keep profile
+                </div>
+              </div>
+              <Button variant="destructive" onClick={() => setShowDeleteData(true)}>Delete</Button>
+            </div>
+
             <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
               <div>
                 <div className="font-medium text-foreground">Export Data</div>
@@ -441,6 +461,76 @@ const ProfilePage = () => {
             </div>
           </div>
         </Card>
+
+
+
+        {/* Delete Data Modal */}
+        {showDeleteData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-xl w-[90vw] max-w-lg">
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-semibold">Delete My Data</h3>
+                  <Button variant="ghost" size="sm" onClick={() => { setShowDeleteData(false); setDeleteResult(null); }}>✕</Button>
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Mode</Label>
+                  <Select value={deleteMode} onValueChange={(v) => setDeleteMode(v as any)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="range">Delete by Date Range</SelectItem>
+                      <SelectItem value="all_keep_profile">Delete ALL (keep profile)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {deleteMode === 'range' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>From</Label>
+                      <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>To</Label>
+                      <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                    </div>
+                  </div>
+                )}
+
+                {deleteResult && (
+                  <div className="text-sm p-3 rounded bg-slate-50 border border-border">
+                    {deleteResult}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => { setShowDeleteData(false); setDeleteResult(null); }}>Cancel</Button>
+                  <Button
+                    variant="destructive"
+                    disabled={deleting || (deleteMode === 'range' && !dateFrom && !dateTo)}
+                    onClick={async () => {
+                      try {
+                        setDeleting(true);
+                        setDeleteResult(null);
+                        const res = await apiClient.deleteUserData({ mode: deleteMode, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined });
+                        setDeleteResult(`Deleted ${res.data?.totalDeleted ?? 0} items`);
+                      } catch (err: any) {
+                        setDeleteResult(err.message || 'Failed to delete data');
+                      } finally {
+                        setDeleting(false);
+                      }
+                    }}
+                  >
+                    {deleting ? 'Deleting…' : 'Confirm Delete'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

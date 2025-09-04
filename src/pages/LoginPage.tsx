@@ -228,8 +228,8 @@ const LoginPage = () => {
           {/* Dynamic header based on current step */}
           {currentStep === 'login' && (
             <>
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome back</h2>
-              <p className="text-gray-600">Sign in to your account to continue</p>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome back</h2>
+          <p className="text-gray-600">Sign in to your account to continue</p>
             </>
           )}
           {currentStep === 'forgot-password' && (
@@ -268,117 +268,117 @@ const LoginPage = () => {
           )}
 
           {/* Error/Success Alerts */}
-          {error && (
+            {error && (
             <Alert variant="destructive" className="mb-6">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
           {success && (
             <Alert className="mb-6 border-green-200 bg-green-50">
               <AlertDescription className="text-green-800">{success}</AlertDescription>
-            </Alert>
-          )}
+              </Alert>
+            )}
 
           {/* LOGIN STEP */}
           {currentStep === 'login' && (
             <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-6">
-              {/* Email Field */}
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                  Email address
-                </Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    className="pl-10 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+            {/* Email Field */}
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                Email address
+              </Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  className="pl-10 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     {...loginForm.register('email')}
-                  />
-                </div>
+                />
+              </div>
                 {loginForm.formState.errors.email && (
                   <p className="text-sm text-red-600">{loginForm.formState.errors.email.message}</p>
-                )}
-              </div>
+              )}
+            </div>
 
-              {/* Password Field */}
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-gray-700">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your password"
-                    className="pl-10 pr-10 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+            {/* Password Field */}
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                Password
+              </Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter your password"
+                  className="pl-10 pr-10 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     {...loginForm.register('password')}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
                 {loginForm.formState.errors.password && (
                   <p className="text-sm text-red-600">{loginForm.formState.errors.password.message}</p>
-                )}
-              </div>
+              )}
+            </div>
 
-              {/* Remember Me & Forgot Password */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="rememberMe" 
+            {/* Remember Me & Forgot Password */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="rememberMe" 
                     {...loginForm.register('rememberMe', { 
-                      setValueAs: (value) => value === 'on' || value === true 
-                    })} 
-                  />
-                  <Label htmlFor="rememberMe" className="text-sm text-gray-600">
-                    Remember me
-                  </Label>
-                </div>
+                    setValueAs: (value) => value === 'on' || value === true 
+                  })} 
+                />
+                <Label htmlFor="rememberMe" className="text-sm text-gray-600">
+                  Remember me
+                </Label>
+              </div>
                 <button
                   type="button"
                   onClick={() => setCurrentStep('forgot-password')}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Forgot password?
-                </button>
-              </div>
-
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  'Sign in'
-                )}
-              </Button>
+                Forgot password?
+                </button>
+            </div>
 
-              {/* Test Credentials */}
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-800 font-medium mb-2">Test Credentials:</p>
-                <p className="text-xs text-blue-700">Email: luckybeel101@gmail.com</p>
-                <p className="text-xs text-blue-700">Password: LuckyPass123!</p>
-                <p className="text-xs text-blue-600 mt-1">(Your test account)</p>
-              </div>
-            </form>
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign in'
+              )}
+            </Button>
+
+            {/* Test Credentials */}
+            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-sm text-blue-800 font-medium mb-2">Test Credentials:</p>
+              <p className="text-xs text-blue-700">Email: luckybeel101@gmail.com</p>
+              <p className="text-xs text-blue-700">Password: LuckyPass123!</p>
+              <p className="text-xs text-blue-600 mt-1">(Your test account)</p>
+            </div>
+          </form>
           )}
 
           {/* FORGOT PASSWORD STEP */}
@@ -581,17 +581,17 @@ const LoginPage = () => {
 
           {/* Sign Up Link - Only show on login step */}
           {currentStep === 'login' && (
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
-                <Link
-                  to="/signup"
-                  className="text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Sign up for free
-                </Link>
-              </p>
-            </div>
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{' '}
+              <Link
+                to="/signup"
+                className="text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Sign up for free
+              </Link>
+            </p>
+          </div>
           )}
         </Card>
 

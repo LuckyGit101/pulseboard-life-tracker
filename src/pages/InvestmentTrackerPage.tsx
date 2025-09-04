@@ -66,21 +66,15 @@ const InvestmentTrackerPage = () => {
   }, [isAuthenticated]);
 
   const loadMockInvestments = () => {
-    console.log('Loading empty investments for demo mode...');
     setInvestments(emptyInvestments);
-    console.log('Empty investments loaded: 0 investments');
   };
 
   const loadInvestments = async () => {
     setLoading(true);
     try {
-      console.log('Loading investments from API...');
       const apiInvestments = await apiClient.getInvestments();
-      console.log('Loaded investments:', apiInvestments);
       setInvestments(apiInvestments);
     } catch (error) {
-      console.error('Error loading investments:', error);
-      // On error, set empty array
       setInvestments([]);
     } finally {
       setLoading(false);
@@ -91,7 +85,6 @@ const InvestmentTrackerPage = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Submit investment:', formData);
     // Reset form
     setFormData({
       name: '',
@@ -115,7 +108,7 @@ const InvestmentTrackerPage = () => {
   };
 
   const handleDelete = (id: string) => {
-    console.log('Delete investment:', id);
+    // Delete investment logic would go here
   };
 
   const handleCancel = () => {

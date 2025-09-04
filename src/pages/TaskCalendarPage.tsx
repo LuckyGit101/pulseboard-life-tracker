@@ -79,59 +79,42 @@ const TaskCalendarPage = () => {
   }, [isAuthenticated, selectedDate, taskView]);
 
   const loadMockTasks = () => {
-    console.log('Loading empty tasks for demo mode...');
     setTasks([]);
-    console.log('Empty tasks loaded: 0 tasks');
   };
 
   const loadTasks = async () => {
     setLoading(true);
     try {
-      console.log('Loading tasks from API...');
-      
       let apiResponse;
       if (taskView === 'tasks') {
         // For "Other Tasks" view, get all tasks without date filter
-        console.log('Fetching all tasks for "Other Tasks" view...');
         apiResponse = await apiClient.getTasks({
           view: 'tasks'
         });
       } else if (taskView === 'weekly') {
         // For weekly view, get all tasks and filter by week range
-        console.log('Fetching all tasks for weekly view...');
         apiResponse = await apiClient.getTasks({
           view: 'weekly'
         });
       } else {
         // For daily view, get tasks for specific date
         const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
-        console.log('Fetching tasks for date:', selectedDateStr, 'view:', taskView);
         apiResponse = await apiClient.getTasks({
           date: selectedDateStr,
           view: 'daily'
         });
       }
       
-      console.log('API Response:', apiResponse);
-      console.log('API Response type:', typeof apiResponse);
-      console.log('API Response length:', apiResponse?.length);
-      console.log('API Response is array:', Array.isArray(apiResponse));
-      console.log('API Response details:', JSON.stringify(apiResponse, null, 2));
-      console.log('API Response first task date:', apiResponse[0]?.date);
-      console.log('API Response first task userId:', apiResponse[0]?.userId);
-      
-      // Check if we have real tasks from API
-      if (apiResponse && apiResponse.length > 0) {
+       // Check if we have real tasks from API
+       if (apiResponse && apiResponse.length > 0) {
         // Transform API tasks to match UI structure
         const transformedTasks = apiResponse.map(transformApiTask);
-        console.log('Using real tasks:', transformedTasks.length, 'tasks');
         
         // Apply view-specific filtering
         let filteredTasks;
         if (taskView === 'tasks') {
           // For "Other Tasks" view, only show tasks without dates
           filteredTasks = transformedTasks.filter(task => !task.date);
-          console.log('Tasks without dates:', filteredTasks.length, 'tasks');
         } else if (taskView === 'weekly') {
           // For weekly view, filter tasks within the week (Sunday to Saturday)
           const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 }); // Sunday = 0
@@ -142,7 +125,6 @@ const TaskCalendarPage = () => {
             const taskDate = new Date(task.date);
             return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
           });
-          console.log('Weekly tasks:', filteredTasks.length, 'tasks for week', format(weekStart, 'yyyy-MM-dd'), 'to', format(weekEnd, 'yyyy-MM-dd'));
         } else {
           // For daily view, show all tasks (already filtered by date in API)
           filteredTasks = transformedTasks;
@@ -151,12 +133,9 @@ const TaskCalendarPage = () => {
         setTasks(filteredTasks);
       } else {
         // No real tasks found, set empty array
-        console.log('No real tasks found, setting empty array');
         setTasks([]);
       }
     } catch (error) {
-      console.error('Error loading tasks:', error);
-      // On error, set empty array instead of falling back to mock data
       setTasks([]);
     } finally {
       setLoading(false);
@@ -165,7 +144,6 @@ const TaskCalendarPage = () => {
 
   const handleTaskToggle = async (taskId: string) => {
     if (!isAuthenticated) {
-      console.log('Mock toggle task:', taskId);
       return;
     }
 
@@ -173,7 +151,6 @@ const TaskCalendarPage = () => {
       const task = tasks.find(t => t.id === taskId);
       if (!task) return;
 
-      console.log('Toggling task:', taskId);
       await apiClient.updateTask(taskId, {
         status: task.completed ? 'pending' : 'completed'
       });
@@ -188,7 +165,6 @@ const TaskCalendarPage = () => {
   const handleTaskEdit = (task: typeof emptyTasks[0]) => {
     // Check if this is a mock task (has simple ID like '1', '2', '3')
     if (task.id && task.id.length < 10) {
-      console.log('Cannot edit mock task:', task.id);
       alert('Cannot edit mock task. Please create a new task instead.');
       return;
     }
@@ -199,16 +175,14 @@ const TaskCalendarPage = () => {
 
   const handleTaskDelete = async (taskId: string) => {
     if (!isAuthenticated) {
-      console.log('Mock delete task:', taskId);
       return;
     }
 
     try {
-      console.log('Deleting task:', taskId);
       await apiClient.deleteTask(taskId);
       await loadTasks(); // Refresh tasks
     } catch (error) {
-      console.error('Error deleting task:', error);
+      // Handle delete error silently
     }
   };
 
@@ -219,7 +193,6 @@ const TaskCalendarPage = () => {
 
   const handleSaveTask = async (taskData: any, editMode?: 'single' | 'series') => {
     if (!isAuthenticated) {
-      console.log('Mock save task:', taskData);
       setShowTaskForm(false);
       setEditingTask(undefined);
       return;
@@ -227,15 +200,10 @@ const TaskCalendarPage = () => {
 
     try {
       const transformedPoints = transformPointsToBackend(taskData.points);
-      console.log('Saving task:', taskData);
-      console.log('Original points:', taskData.points);
-      console.log('Transformed points for backend:', transformedPoints);
-      console.log('Edit mode:', editMode);
       
       if (editingTask) {
         // Check if this is a mock task (has simple ID like '1', '2', '3')
         if (editingTask.id && editingTask.id.length < 10) {
-          console.error('Cannot update mock task. Please create a new task instead.');
           alert('Cannot update mock task. Please create a new task instead.');
           setShowTaskForm(false);
           setEditingTask(undefined);
@@ -245,7 +213,6 @@ const TaskCalendarPage = () => {
         // Check if this is a recurring task and editMode is specified
         if (editingTask.repeatFrequency && editingTask.repeatFrequency !== 'none' && editMode === 'series') {
           // Update entire recurring series
-          console.log('Updating entire recurring series for task:', editingTask.id);
           await apiClient.updateRecurringInstances(editingTask.id, {
             updates: {
               name: taskData.title,
@@ -259,13 +226,13 @@ const TaskCalendarPage = () => {
           });
         } else {
           // Update single task instance
-          await apiClient.updateTask(editingTask.id, {
-            name: taskData.title,
-            description: taskData.description,
-            date: taskData.date,
-            categories: taskData.categories,
-            points: transformedPoints
-          });
+        await apiClient.updateTask(editingTask.id, {
+          name: taskData.title,
+          description: taskData.description,
+          date: taskData.date,
+          categories: taskData.categories,
+          points: transformedPoints
+        });
         }
       } else {
         // Check if this is a recurring task
@@ -284,29 +251,23 @@ const TaskCalendarPage = () => {
               points: transformedPoints
             }
           };
-          console.log('Creating recurring task with payload:', recurringPayload);
           await apiClient.createRecurringRule(recurringPayload);
-        } else {
-          // Create regular one-time task
-          const taskPayload = {
-            name: taskData.title,
-            description: taskData.description,
-            date: taskData.date,
-            categories: taskData.categories,
-            points: transformedPoints,
-            status: 'pending' as const
-          };
-          console.log('Creating one-time task with payload:', taskPayload);
-          console.log('Task date format:', taskData.date, 'Type:', typeof taskData.date);
-          const result = await apiClient.createTask(taskPayload);
-          console.log('Task creation result:', result);
-          console.log('Task creation successful, refreshing tasks...');
-          console.log('Created task details:', result.task);
-        }
+               } else {
+         // Create regular one-time task
+         const taskPayload = {
+           name: taskData.title,
+           description: taskData.description,
+           date: taskData.date,
+           categories: taskData.categories,
+           points: transformedPoints,
+           status: 'pending' as const
+         };
+         const result = await apiClient.createTask(taskPayload);
+       }
       }
       
-      setShowTaskForm(false);
-      setEditingTask(undefined);
+    setShowTaskForm(false);
+    setEditingTask(undefined);
       await loadTasks(); // Refresh tasks
     } catch (error) {
       console.error('Error saving task:', error);
@@ -320,7 +281,6 @@ const TaskCalendarPage = () => {
 
   const getFilteredTasks = () => {
     // Tasks are already filtered based on the current view in loadTasks
-    console.log('Returning filtered tasks for view:', taskView, 'count:', tasks.length);
     return tasks;
   };
 
@@ -395,7 +355,7 @@ const TaskCalendarPage = () => {
               
               <ToggleTabs
                 value={taskView}
-                onValueChange={(value) => setTaskView(value as 'daily' | 'weekly' | 'tasks')}
+                   onValueChange={(value) => setTaskView(value as 'daily' | 'weekly' | 'tasks')}
                 items={[
                   { value: 'daily', label: 'Daily' },
                   { value: 'weekly', label: 'Weekly' },

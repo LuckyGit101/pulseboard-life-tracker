@@ -3,14 +3,14 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import StatBar from '@/components/ui/stat-bar';
 import ToggleTabs from '@/components/ui/toggle-tabs';
-import { User, Trophy, Plus, Edit, Trash2, CheckCircle, Circle } from 'lucide-react';
+import { User, Trophy, Plus, Edit, Trash2, CheckCircle, Circle, RefreshCw } from 'lucide-react';
 import { ChartContainer, ChartTooltipContent, ChartLegendContent } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { format, subDays, startOfWeek, startOfMonth, isWithinInterval, parseISO } from 'date-fns';
-import { STANDARD_CATEGORIES, TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
+import { TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
 import { useCategories } from '@/contexts/CategoryContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiClient } from '@/lib/api';
+import { apiClient, Goal, CreateGoalRequest } from '@/lib/api';
 
 // Empty stats data for when no data is available
 const emptyStats = [
@@ -21,21 +21,6 @@ const emptyStats = [
   { name: 'Spirit', current: 0, max: 100, color: 'spirit' as const }
 ];
 
-// Empty user data
-const emptyUser = {
-  name: '',
-  email: '',
-  avatar: '',
-  joinDate: '',
-  age: 0,
-  gender: '',
-  timezone: '',
-  totalTasks: 0,
-  completedTasks: 0,
-  level: 0,
-  monthlyIncome: 0,
-  location: ''
-};
 
 // Empty goals data
 const emptyGoals = [];
@@ -73,43 +58,53 @@ const achievements = [
   }
 ];
 
-// Dummy data for last 3 months - Updated to use only 5 categories
+// Categories and colors for charts
 const categories = ['Health', 'Strength', 'Mind', 'Work', 'Spirit'];
 const colors = ['#22c55e', '#f59e0b', '#8b5cf6', '#3b82f6', '#ef4444'];
 
-function generateDummyLineData() {
-  const data = [];
-  // Start with more realistic baseline values
-  let current = [48, 28, 22, 18, 15];
-  
-  for (let i = 90; i >= 0; i--) {
-    const date = subDays(new Date(), i);
-    // Simulate more realistic progress with trends
-    current = current.map((v, idx) => {
-      // Add some trend and randomness
-      const trend = Math.sin(i / 10 + idx) * 0.5; // Cyclical trend
-      const random = (Math.random() - 0.5) * 2; // Random variation
-      const change = trend + random;
-      return Math.max(0, Math.min(100, v + change)); // Keep within 0-100 range
-    });
-    
-    data.push({
-      date: format(date, 'yyyy-MM-dd'),
-      Health: Math.round(current[0]),
-      Strength: Math.round(current[1]),
-      Mind: Math.round(current[2]),
-      Work: Math.round(current[3]),
-      Spirit: Math.round(current[4]),
-    });
-  }
-  return data;
-}
-
-const lineData = generateDummyLineData();
-
-function filterLineData(range, custom) {
+// Helper function to get start date based on range
+const getStartDate = (range: string, custom: { from: Date | null; to: Date | null }) => {
   const today = new Date();
-  let startDate;
+  let startDate: Date;
+  
+  switch (range) {
+    case 'week':
+      startDate = startOfWeek(today);
+      break;
+    case 'month':
+      startDate = startOfMonth(today);
+      break;
+    case 'custom':
+      if (custom.from) {
+        startDate = custom.from;
+      } else {
+        startDate = subDays(today, 30); // Default to 30 days
+      }
+      break;
+    default:
+      startDate = subDays(today, 30); // Default to 30 days
+  }
+  
+  return startDate.toISOString().split('T')[0];
+};
+
+// Helper function to get end date based on range
+const getEndDate = (range: string, custom: { from: Date | null; to: Date | null }) => {
+  const today = new Date();
+  
+  if (range === 'custom' && custom.to) {
+    return custom.to.toISOString().split('T')[0];
+  }
+  
+  return today.toISOString().split('T')[0];
+};
+
+// Helper function to filter line data by date range
+function filterLineData(data: any[], range: string, custom: { from: Date | null; to: Date | null }) {
+  if (!data || data.length === 0) return [];
+  
+  const today = new Date();
+  let startDate: Date;
   
   switch (range) {
     case 'week':
@@ -120,32 +115,54 @@ function filterLineData(range, custom) {
       break;
     case 'custom':
       if (custom.from && custom.to) {
-        return lineData.filter(d => {
+        return data.filter(d => {
           const date = parseISO(d.date);
-          return isWithinInterval(date, { start: custom.from, end: custom.to });
+          return isWithinInterval(date, { start: custom.from!, end: custom.to! });
         });
       }
-      return lineData;
+      return data;
     default:
-      return lineData;
+      return data;
   }
   
-  return lineData.filter(d => {
+  return data.filter(d => {
     const date = parseISO(d.date);
     return isWithinInterval(date, { start: startDate, end: today });
   });
 }
 
-function getPieData(filteredLineData) {
+// Helper function to get pie chart data from line data
+function getPieData(filteredLineData: any[]) {
+  if (!filteredLineData || filteredLineData.length === 0) {
+    return categories.map((cat, i) => ({ 
+      name: cat, 
+      value: 0, 
+      color: colors[i],
+      percentage: 0
+    }));
+  }
+  
   // Use the last entry for current distribution
   const last = filteredLineData[filteredLineData.length - 1] || {};
-  return categories.map((cat, i) => ({ 
+  
+  return categories.map((cat, i) => {
+    const rawValue = last[cat] || 0;
+    // Show 0 for negative values in charts (as requested)
+    const displayValue = Math.max(0, rawValue);
+    
+    return { 
     name: cat, 
-    value: last[cat] || 0, 
+      value: displayValue, 
     color: colors[i],
-    percentage: 0 // Will be calculated
-  })).map(item => {
-    const total = categories.reduce((sum, cat) => sum + (last[cat] || 0), 0);
+      rawValue: rawValue, // Keep raw value for other calculations
+      percentage: 0
+    };
+  }).map(item => {
+    const total = categories.reduce((sum, cat) => {
+      const rawValue = last[cat] || 0;
+      return sum + Math.max(0, rawValue); // Use display values for percentage calculation
+    }, 0);
+    
     return {
       ...item,
       percentage: total > 0 ? Math.round((item.value / total) * 100) : 0
@@ -163,8 +180,16 @@ const ProgressPage = () => {
   const [lineCustom, setLineCustom] = useState({ from: null, to: null });
   const [pieCustom, setPieCustom] = useState({ from: null, to: null });
   const [isCreatingGoal, setIsCreatingGoal] = useState(false);
-  const [goals, setGoals] = useState<typeof emptyGoals>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // New state for real points data
+  const [lineData, setLineData] = useState<any[]>([]);
+  const [statsData, setStatsData] = useState<any[]>([]);
+  const [totalPoints, setTotalPoints] = useState(0);
+  const [loadingPoints, setLoadingPoints] = useState(false);
+  const [pieTotals, setPieTotals] = useState<Record<string, number> | null>(null);
+  
   const [goalForm, setGoalForm] = useState(() => {
     const initialCategories = taskCategories.reduce((acc, cat) => {
       acc[cat.name] = { selected: false, points: '' };
@@ -172,9 +197,9 @@ const ProgressPage = () => {
     }, {} as Record<string, { selected: boolean; points: string }>);
     
     return {
-      title: '',
-      startDate: '',
-      endDate: '',
+    title: '',
+    startDate: '',
+    endDate: '',
       categories: initialCategories
     };
   });
@@ -183,77 +208,238 @@ const ProgressPage = () => {
   useEffect(() => {
     if (isAuthenticated) {
       loadGoals();
+      loadPointsData(); // Load real points data
     } else {
       // Load mock data for demo mode
       loadMockGoals();
+      loadMockPointsData();
     }
   }, [isAuthenticated]);
 
+  // Load points data when range changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadPointsData();
+    }
+  }, [lineRange, lineCustom, pieRange, pieCustom]);
+
   const loadMockGoals = () => {
-    console.log('Loading empty goals for demo mode...');
     setGoals(emptyGoals);
-    console.log('Empty goals loaded: 0 goals');
+  };
+
+  const loadMockPointsData = () => {
+    setLineData([]);
+    setStatsData(emptyStats);
+    setTotalPoints(0);
   };
 
   const loadGoals = async () => {
     setLoading(true);
     try {
-      console.log('Loading goals from API...');
       const apiGoals = await apiClient.getGoals();
-      console.log('Loaded goals:', apiGoals);
-      setGoals(apiGoals);
+      // Ensure apiGoals is always an array
+      setGoals(Array.isArray(apiGoals) ? apiGoals : []);
     } catch (error) {
-      console.error('Error loading goals:', error);
-      // On error, set empty array
       setGoals([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredLineData = filterLineData(lineRange, lineCustom);
-  const filteredPieData = filterLineData(pieRange, pieCustom);
-  const pieData = getPieData(filteredPieData);
+  const loadPointsData = async () => {
+    if (!isAuthenticated) return;
+    
+    setLoadingPoints(true);
+    try {
+      // Lifetime tile
+      const lifetimeResp = await apiClient.getPointsSummary({ period: 'lifetime' });
+      if (lifetimeResp) {
+        setTotalPoints(lifetimeResp.total || 0);
+        // Also populate lifetime stats bars
+        const lifetimeStats = categories.map((cat, idx) => ({
+          name: cat,
+          current: Math.max(0, (lifetimeResp.categories?.[cat.toLowerCase()] ?? 0)),
+          max: 100,
+          color: ['health', 'strength', 'mind', 'work', 'spirit'][idx] as any
+        }));
+        setStatsData(lifetimeStats);
+      } else {
+        setTotalPoints(0);
+      }
 
-  const handleCreateGoal = () => {
+      // Date range from UI selections
+      let startDateAny: any = getStartDate(lineRange, lineCustom);
+      let endDateAny: any = getEndDate(lineRange, lineCustom);
+      const startDate = (startDateAny instanceof Date) ? startDateAny : new Date(startDateAny);
+      const endDate = (endDateAny instanceof Date) ? endDateAny : new Date(endDateAny);
+      const df = startDate.toISOString().split('T')[0];
+      const dt = endDate.toISOString().split('T')[0];
+
+      // Pie chart totals for range
+      const rangeTotalsResp = await apiClient.getPointsSummary({ date_from: df, date_to: dt });
+      if (rangeTotalsResp) {
+        setPieTotals(rangeTotalsResp.categories || null);
+      } else {
+        setPieTotals(null);
+      }
+
+      // Line chart cumulative series for range using new API
+      const cumulativeResp = await apiClient.getDailyCumulative({ date_from: df, date_to: dt });
+      if (cumulativeResp && cumulativeResp.series) {
+        // Transform the series data for the line chart
+        const transformedData = cumulativeResp.series.map(item => ({
+          date: item.date,
+          Health: Math.max(0, item.categories.health || 0),
+          Strength: Math.max(0, item.categories.strength || 0),
+          Mind: Math.max(0, item.categories.mind || 0),
+          Work: Math.max(0, item.categories.work || 0),
+          Spirit: Math.max(0, item.categories.spirit || 0),
+        }));
+        setLineData(transformedData);
+      } else {
+        setLineData([]);
+      }
+
+      // Auto-sync goals when points data loads
+      if (goals && Array.isArray(goals) && goals.length > 0) {
+        try {
+          await apiClient.syncGoalProgress();
+          // Reload goals after sync
+          await loadGoals();
+        } catch (syncError) {
+          console.error('Auto goal sync failed:', syncError);
+        }
+      }
+       
+    } catch (error) {
+      console.error('Error loading points data:', error);
+      // On error, set empty data
+      setLineData([]);
+      // Do not reset lifetime tile if it was already set successfully
+    } finally {
+      setLoadingPoints(false);
+    }
+  };
+
+  const filteredLineData = filterLineData(lineData, lineRange, lineCustom);
+  let pieData: any[] = [];
+  if (pieTotals) {
+    const total = categories.reduce((sum, cat) => sum + Math.max(0, (pieTotals![cat.toLowerCase()] || 0)), 0);
+    pieData = categories.map((cat, i) => {
+      const raw = Math.max(0, (pieTotals![cat.toLowerCase()] || 0));
+      return {
+        name: cat,
+        value: raw,
+        color: colors[i],
+        rawValue: raw,
+        percentage: total > 0 ? Math.round((raw / total) * 100) : 0,
+      };
+    });
+  } else {
+    const filteredPieData = filterLineData(lineData, pieRange, pieCustom);
+    pieData = getPieData(filteredPieData);
+  }
+
+  const handleCreateGoal = async () => {
+    if (!goalForm.title.trim()) return;
+
     const selectedCategories = Object.entries(goalForm.categories)
       .filter(([_, { selected }]) => selected)
       .reduce((acc, [category, { points }]) => {
-        acc[category] = parseInt(points) || 0;
+        const numeric = Math.max(0, Math.min(10, Math.floor(Number(points) || 0)));
+        acc[category.toLowerCase()] = numeric;
         return acc;
-      }, {});
+      }, {} as Record<string, number>);
 
-    const totalPoints = Object.values(selectedCategories).reduce((sum, points) => sum + points, 0);
+    // Ensure at least one category is selected
+    if (Object.keys(selectedCategories).length === 0) {
+      alert('Please select at least one category for your goal.');
+      return;
+    }
 
-    const newGoal = {
-      id: Date.now().toString(),
-      title: goalForm.title,
+    const goalData = {
+      name: goalForm.title,
       description: `Goal: ${goalForm.title}`,
-      completed: false,
-      startDate: goalForm.startDate || format(new Date(), 'yyyy-MM-dd'),
-      endDate: goalForm.endDate,
-      categories: selectedCategories,
-      totalPoints,
-      currentPoints: 0
+      startDate: goalForm.startDate || undefined,
+      targetDate: goalForm.endDate,
+      category: Object.keys(selectedCategories)[0] || 'health', // Use first selected category
+      points: selectedCategories
     };
 
-    setGoals(prev => [...prev, newGoal]);
-    setIsCreatingGoal(false);
-    const resetCategories = taskCategories.reduce((acc, cat) => {
-      acc[cat.name] = { selected: false, points: '' };
-      return acc;
-    }, {} as Record<string, { selected: boolean; points: string }>);
-    
-    setGoalForm({
-      title: '',
-      startDate: '',
-      endDate: '',
-      categories: resetCategories
-    });
+    try {
+      if (isAuthenticated) {
+        const newGoal = await apiClient.createGoal(goalData);
+        setGoals(prev => [...prev, newGoal]);
+      } else {
+        // Demo mode - create mock goal
+        const newGoal = {
+          id: Date.now().toString(),
+          name: goalForm.title,
+          description: `Goal: ${goalForm.title}`,
+          startDate: goalForm.startDate || undefined,
+          targetDate: goalForm.endDate,
+          category: Object.keys(selectedCategories)[0] || 'health',
+          progress: 0,
+          status: 'active' as const,
+          currentValue: 0,
+          targetValue: Object.values(selectedCategories).reduce((sum, points) => sum + points, 0),
+          points: selectedCategories,
+          userId: 'demo',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        setGoals(prev => [...prev, newGoal]);
+      }
+      
+      setIsCreatingGoal(false);
+      const resetCategories = taskCategories.reduce((acc, cat) => {
+        acc[cat.name] = { selected: false, points: '' };
+        return acc;
+      }, {} as Record<string, { selected: boolean; points: string }>);
+      
+      setGoalForm({
+        title: '',
+        startDate: '',
+        endDate: '',
+        categories: resetCategories
+      });
+    } catch (error) {
+      console.error('Failed to create goal:', error);
+    }
   };
 
-  const handleDeleteGoal = (goalId: string) => {
-    setGoals(prev => prev.filter(goal => goal.id !== goalId));
+  const handleDeleteGoal = async (goalId: string) => {
+    try {
+      if (isAuthenticated) {
+        await apiClient.deleteGoal(goalId);
+      }
+      setGoals(prev => prev.filter(goal => goal.id !== goalId));
+    } catch (error) {
+      console.error('Failed to delete goal:', error);
+    }
+  };
+
+  const handleUpdateGoal = async (goalId: string, updates: Partial<Goal>) => {
+    try {
+      if (isAuthenticated) {
+        const updatedGoal = await apiClient.updateGoal(goalId, updates);
+        setGoals(prev => prev.map(g => g.id === goalId ? updatedGoal : g));
+      }
+    } catch (error) {
+      console.error('Failed to update goal:', error);
+    }
+  };
+
+  const handleSyncGoals = async () => {
+    try {
+      if (isAuthenticated) {
+        await apiClient.syncGoalProgress();
+        // Reload goals after sync
+        await loadGoals();
+      }
+    } catch (error) {
+      // Handle sync error silently
+    }
   };
 
   const handleCancelGoal = () => {
@@ -282,11 +468,17 @@ const ProgressPage = () => {
   };
 
   const handlePointsChange = (category: string, points: string) => {
+    // Sanitize: allow empty while typing; otherwise clamp 0-10 and integers only
+    let sanitized = points;
+    if (sanitized !== '') {
+      const numeric = Math.max(0, Math.min(10, Math.floor(Number(sanitized) || 0)));
+      sanitized = String(numeric);
+    }
     setGoalForm(prev => ({
       ...prev,
       categories: {
         ...prev.categories,
-        [category]: { ...prev.categories[category], points }
+        [category]: { ...prev.categories[category], points: sanitized }
       }
     }));
   };
@@ -302,9 +494,9 @@ const ProgressPage = () => {
     }
   };
 
-  const getGoalBackground = (goal: any) => {
-    if (goal.completed) return 'bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-amber-400 shadow-amber-100';
-    const progress = (goal.currentPoints / goal.totalPoints) * 100;
+  const getGoalBackground = (goal: Goal) => {
+    if (goal.status === 'completed') return 'bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-amber-400 shadow-amber-100';
+    const progress = goal.progress || 0;
     if (progress >= 50) return 'bg-gradient-to-br from-white to-emerald-50 border-2 border-emerald-300 shadow-emerald-100';
     return 'bg-gradient-to-br from-gray-100 to-gray-200 border-2 border-gray-300 shadow-gray-100';
   };
@@ -348,7 +540,7 @@ const ProgressPage = () => {
               Lifetime Stats Overview
             </h3>
             <div className="space-y-4 mb-6">
-              {emptyStats.map((stat, idx) => (
+              {statsData.map((stat, idx) => (
                 <div key={stat.name} className="flex items-center gap-4">
                   <span className={`w-3 h-3 rounded-full mt-1 ${
                     stat.color === 'health' ? 'bg-green-500' :
@@ -377,7 +569,9 @@ const ProgressPage = () => {
             </div>
             <div className="flex items-center justify-between mt-6">
               <span className="font-bold text-lg">🏆 Total Points</span>
-              <span className="text-3xl font-extrabold text-violet-600 bg-violet-100 px-6 py-2 rounded-full shadow">0</span>
+              <span className="text-3xl font-extrabold text-violet-600 bg-violet-100 px-6 py-2 rounded-full shadow">
+                {loadingPoints ? '...' : totalPoints}
+              </span>
           </div>
         </Card>
 
@@ -456,29 +650,43 @@ const ProgressPage = () => {
             
             {/* Date Range Inputs - Only Visible for Custom Range */}
             {lineRange === 'custom' && (
-              <div className="flex gap-3 mb-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm text-muted-foreground">Start Date</label>
-                  <input 
-                    type="date" 
-                    className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
+            <div className="flex gap-3 mb-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm text-muted-foreground">Start Date</label>
+                <input 
+                  type="date" 
+                  className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
                     value={lineCustom.from ? format(lineCustom.from, 'yyyy-MM-dd') : ''}
-                    onChange={e => setLineCustom(c => ({...c, from: new Date(e.target.value)}))} 
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm text-muted-foreground">End Date</label>
-                  <input 
-                    type="date" 
-                    className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
-                    value={lineCustom.to ? format(lineCustom.to, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')}
-                    onChange={e => setLineCustom(c => ({...c, to: new Date(e.target.value)}))} 
-                  />
-                </div>
+                  onChange={e => setLineCustom(c => ({...c, from: new Date(e.target.value)}))} 
+                />
               </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm text-muted-foreground">End Date</label>
+                <input 
+                  type="date" 
+                  className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
+                    value={lineCustom.to ? format(lineCustom.to, 'yyyy-MM-dd') : ''}
+                  onChange={e => setLineCustom(c => ({...c, to: new Date(e.target.value)}))} 
+                />
+              </div>
+        </div>
             )}
 
             <div className="h-80 w-full">
+              {loadingPoints ? (
+                <div className="h-full w-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                    <p className="text-sm text-muted-foreground">Loading points data...</p>
+                  </div>
+                </div>
+              ) : filteredLineData.length === 0 ? (
+                <div className="h-full w-full flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">No data available for selected range</p>
+                  </div>
+                </div>
+              ) : (
               <ChartContainer 
                 config={{
                   Health: { color: colors[0], label: "Health" },
@@ -511,6 +719,7 @@ const ProgressPage = () => {
                   </LineChart>
                 </ResponsiveContainer>
               </ChartContainer>
+              )}
             </div>
           </Card>
           
@@ -547,29 +756,43 @@ const ProgressPage = () => {
             
             {/* Date Range Inputs - Only Visible for Custom Range */}
             {pieRange === 'custom' && (
-              <div className="flex gap-3 mb-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm text-muted-foreground">Start Date</label>
-                  <input 
-                    type="date" 
-                    className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
+            <div className="flex gap-3 mb-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm text-muted-foreground">Start Date</label>
+                <input 
+                  type="date" 
+                  className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
                     value={pieCustom.from ? format(pieCustom.from, 'yyyy-MM-dd') : ''}
-                    onChange={e => setPieCustom(c => ({...c, from: new Date(e.target.value)}))} 
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm text-muted-foreground">End Date</label>
-                  <input 
-                    type="date" 
-                    className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
-                    value={pieCustom.to ? format(pieCustom.to, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')}
-                    onChange={e => setPieCustom(c => ({...c, to: new Date(e.target.value)}))} 
-                  />
-                </div>
+                  onChange={e => setPieCustom(c => ({...c, from: new Date(e.target.value)}))} 
+                />
               </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm text-muted-foreground">End Date</label>
+                <input 
+                  type="date" 
+                  className="border border-border rounded-lg px-3 py-2 text-sm bg-white" 
+                    value={pieCustom.to ? format(pieCustom.to, 'yyyy-MM-dd') : ''}
+                  onChange={e => setPieCustom(c => ({...c, to: new Date(e.target.value)}))} 
+                />
+              </div>
+            </div>
             )}
             
             <div className="h-80 w-full">
+              {loadingPoints ? (
+                <div className="h-full w-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                    <p className="text-sm text-muted-foreground">Loading points data...</p>
+                  </div>
+                </div>
+              ) : pieData.length === 0 || pieData.every(item => item.value === 0) ? (
+                <div className="h-full w-full flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">No data available for selected range</p>
+                  </div>
+                </div>
+              ) : (
               <ChartContainer 
                 config={{
                   Health: { color: colors[0], label: "Health" },
@@ -598,81 +821,219 @@ const ProgressPage = () => {
                         <Cell 
                           key={`cell-${index}`} 
                           fill={entry.color}
-                          stroke="white"
-                          strokeWidth={2}
                         />
                       ))}
                     </Pie>
                     <Tooltip 
                       formatter={(value, name) => [`${value} pts`, name]}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0];
+                            return (
+                              <div className="bg-white p-3 border border-border rounded-lg shadow-lg">
+                                <p className="font-medium">{data.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {data.value} points ({data.payload.percentage}%)
+                                </p>
+                                {data.payload.rawValue < 0 && (
+                                  <p className="text-xs text-red-600 mt-1">
+                                    Raw value: {data.payload.rawValue} (overdue penalty)
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               </ChartContainer>
+              )}
             </div>
           </Card>
         </div>
 
         {/* Goals Section */}
         <Card className={LAYOUT.standardCard}>
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <Edit className="h-5 w-5 text-destructive" />
-              <h3 className={TYPOGRAPHY.sectionHeader}>Your Goals</h3>
-            </div>
-            {!isCreatingGoal && (
+          <div className="flex justify-between items-center mb-6">
+            <h3 className={TYPOGRAPHY.sectionHeader}>Goals</h3>
+            <div className="flex gap-2">
+              {isAuthenticated && goals && Array.isArray(goals) && goals.length > 0 && (
+                <Button
+                  onClick={handleSyncGoals}
+                  variant="outline"
+                  size="sm"
+                  className="text-gray-600 hover:text-gray-800"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Sync Goals
+                </Button>
+              )}
               <Button
                 onClick={() => setIsCreatingGoal(true)}
-                className="rounded-full px-5 py-2 font-semibold shadow-md bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:scale-105 transition-all duration-200"
+                className="bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:scale-105 transition-all duration-200"
               >
-              <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-4 w-4 mr-2" />
                 Create Goal
-            </Button>
-            )}
+              </Button>
+            </div>
           </div>
           
-          {isCreatingGoal ? (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Basic Details */}
-                <div className="lg:col-span-1 space-y-4">
-                  <div className="space-y-2">
-                    <label className={TYPOGRAPHY.cardTitle}>Goal Title</label>
+          {!goals || !Array.isArray(goals) || goals.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trophy className="h-8 w-8 text-gray-400" />
+              </div>
+              <h4 className="text-lg font-medium text-gray-900 mb-2">No goals yet</h4>
+              <p className="text-gray-500 mb-4">Create your first goal to start tracking progress</p>
+              <Button
+                onClick={() => setIsCreatingGoal(true)}
+                variant="outline"
+                className="bg-white"
+              >
+                Create Your First Goal
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {goals && Array.isArray(goals) && goals.map((goal) => {
+                // Use backend-calculated progress or calculate from goal data
+                const goalCategory = (goal.category || 'health').toLowerCase();
+                const currentPoints = goal.currentValue || 0;
+                const targetPoints = goal.points?.[goalCategory] || 0;
+                const progress = goal.progress || (targetPoints > 0 ? (currentPoints / targetPoints) * 100 : 0);
+                const isCompleted = goal.status === 'completed';
+                const isIncomplete = progress < 100 && !isCompleted;
+                
+                return (
+                  <div
+                    key={goal.id}
+                    className={`p-6 rounded-xl border-2 transition-all duration-200 ${getGoalBackground(goal)}`}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="text-lg font-semibold text-gray-900">{goal.name}</h4>
+                          {isCompleted && (
+                            <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">
+                              ✓ Completed
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-gray-600 mb-3">{goal.description}</p>
+                        
+                        {/* Progress Bar */}
+                        <div className="mb-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-gray-700">Progress</span>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {Math.round(progress)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-3">
+                            <div
+                              className={`h-3 rounded-full transition-all duration-300 ${
+                                isCompleted
+                                  ? 'bg-gradient-to-r from-yellow-400 to-amber-500'
+                                  : progress >= 50
+                                  ? 'bg-gradient-to-r from-emerald-400 to-green-500'
+                                  : 'bg-gradient-to-r from-blue-400 to-blue-500'
+                              }`}
+                              style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Categories and Points */}
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {goal.points && Object.entries(goal.points).map(([category, points]) => (
+                            <div
+                              key={category}
+                              className="flex items-center gap-2 bg-white/50 px-3 py-1 rounded-full border border-gray-200"
+                            >
+                              <span className="text-sm font-medium text-gray-700 capitalize">{category}</span>
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                {currentPoints}/{points} pts
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2 ml-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {/* Handle edit */}}
+                          className="text-gray-600 hover:text-gray-800"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteGoal(goal.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Date Range */}
+                    <div className={`text-xs mt-1 ${isIncomplete ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {goal.startDate ? `Start: ${new Date(goal.startDate).toLocaleDateString()}` : 'Start: Not set'} - Target: {goal.targetDate ? new Date(goal.targetDate).toLocaleDateString() : 'Unknown'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Goal Creation Form */}
+          {isCreatingGoal && (
+            <div className="mt-6 p-6 bg-gray-50 rounded-lg border border-gray-200">
+              <h4 className="text-lg font-semibold mb-4">Create New Goal</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Goal Title</label>
                     <input
                       type="text"
                       value={goalForm.title}
                       onChange={(e) => setGoalForm(prev => ({ ...prev, title: e.target.value }))}
                       placeholder="e.g., Summer Fitness Challenge"
-                      className="w-full p-3 border border-border rounded-lg bg-white text-foreground"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       required
                     />
                   </div>
                   
-                  <div className="space-y-2">
-                    <label className={TYPOGRAPHY.cardTitle}>Start Date (Optional)</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date (Optional)</label>
                     <input
                       type="date"
                       value={goalForm.startDate}
                       onChange={(e) => setGoalForm(prev => ({ ...prev, startDate: e.target.value }))}
-                      className="w-full p-3 border border-border rounded-lg bg-white text-foreground"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
                   
-                  <div className="space-y-2">
-                    <label className={TYPOGRAPHY.cardTitle}>End Date (Required)</label>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">End Date (Required)</label>
                     <input
                       type="date"
                       value={goalForm.endDate}
                       onChange={(e) => setGoalForm(prev => ({ ...prev, endDate: e.target.value }))}
-                      className="w-full p-3 border border-border rounded-lg bg-white text-foreground"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       required
                     />
                   </div>
                 </div>
 
-                {/* Category Selection */}
-                <div className="lg:col-span-2 space-y-4">
-                  <label className={TYPOGRAPHY.cardTitle}>Categories & Point Targets</label>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">Categories & Point Targets</label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {Object.entries(goalForm.categories).map(([category, { selected, points }]) => (
                       <div key={category} className={`flex items-center gap-3 p-4 border rounded-lg transition-all duration-200 ${
@@ -685,7 +1046,7 @@ const ProgressPage = () => {
                           onChange={(e) => handleCategoryChange(category, e.target.checked)}
                           className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                         />
-                        <label htmlFor={`category-${category}`} className="flex-1 text-sm font-medium text-foreground cursor-pointer">
+                        <label htmlFor={`category-${category}`} className="flex-1 text-sm font-medium text-gray-700 cursor-pointer">
                           {category}
                         </label>
                         {selected && (
@@ -693,109 +1054,36 @@ const ProgressPage = () => {
                             type="number"
                             placeholder="Points"
                             value={points}
+                            min={0}
+                            max={10}
+                            step={1}
                             onChange={(e) => handlePointsChange(category, e.target.value)}
-                            className="w-24 p-2 bg-white border border-border text-foreground text-sm rounded"
+                            className="w-24 p-2 bg-white border border-gray-300 text-gray-700 text-sm rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             required
                           />
                         )}
                       </div>
                     ))}
-                  </div>
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 pt-6 flex gap-3">
+                <div className="flex gap-3 pt-4">
                 <Button
                   onClick={handleCreateGoal}
-                  className="rounded-full px-5 py-2 font-semibold shadow-md bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:scale-105 transition-all duration-200"
+                    disabled={!goalForm.title || !goalForm.endDate}
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:scale-105 transition-all duration-200"
                 >
                   Create Goal
                 </Button>
                 <Button
                   onClick={handleCancelGoal}
                   variant="outline"
-                  className="rounded-full px-5 py-2 font-semibold shadow-md hover:scale-105 transition-all duration-200"
+                    className="hover:scale-105 transition-all duration-200"
                 >
                   Cancel
                 </Button>
               </div>
             </div>
-          ) : (
-            <div className="max-h-96 overflow-y-auto pr-2 custom-scrollbar">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {goals.map((goal) => {
-                  const progress = (goal.currentPoints / goal.totalPoints) * 100;
-                  const isIncomplete = !goal.completed && progress < 50;
-                  
-                  return (
-                    <div 
-                      key={goal.id} 
-                      className={`rounded-2xl p-4 flex flex-col gap-2 shadow-lg border-2 ${getGoalBackground(goal)} relative cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl active:scale-95`}
-                      onClick={() => {
-                        // Add click effect - you can add modal or navigation here
-                        console.log('Goal clicked:', goal.title);
-                      }}
-                    >
-                      {/* Delete Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteGoal(goal.id);
-                        }}
-                        className="absolute top-2 right-2 p-1 rounded-full bg-red-100 hover:bg-red-200 transition-colors z-10"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </button>
-                      
-                      {/* Completion Status */}
-                      <div className="flex items-center gap-2 mb-2">
-                        {goal.completed ? (
-                          <CheckCircle className="h-5 w-5 text-amber-600" />
-                        ) : (
-                          <Circle className={`h-5 w-5 ${isIncomplete ? 'text-gray-500' : 'text-emerald-300'}`} />
-                        )}
-                        <div className={`font-semibold text-base ${isIncomplete ? 'text-gray-600' : 'text-gray-700'}`}>
-                          {goal.title}
-                        </div>
-                      </div>
-                      
-                      {/* Categories */}
-                      <div className="flex gap-2 flex-wrap">
-                        {Object.keys(goal.categories).map(category => (
-                          <span key={category} className={`text-xs px-2 py-0.5 rounded ${isIncomplete ? 'bg-gray-300 text-gray-600' : getCategoryColor(category)}`}>
-                            {category}
-                          </span>
-                        ))}
-                      </div>
-                      
-                      {/* Points Progress */}
-                      <div className="mt-2">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className={`font-medium ${isIncomplete ? 'text-gray-500' : ''}`}>
-                            {goal.completed ? 'Completed' : `${goal.currentPoints}/${goal.totalPoints} pts`}
-                          </span>
-                          <span className={`font-bold ${goal.completed ? 'text-amber-600' : isIncomplete ? 'text-gray-500' : 'text-emerald-400'}`}>
-                            {goal.totalPoints} pts
-                          </span>
-                        </div>
-                        {!goal.completed && (
-                          <div className="w-full h-2 bg-gray-200 rounded-full mt-1">
-                            <div 
-                              className={`h-2 rounded-full transition-all ${isIncomplete ? 'bg-gray-400' : 'bg-emerald-300'}`}
-                              style={{ width: `${(goal.currentPoints / goal.totalPoints) * 100}%` }} 
-                            />
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Date Range */}
-                      <div className={`text-xs mt-1 ${isIncomplete ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {goal.startDate} - {goal.endDate}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
           )}
         </Card>
