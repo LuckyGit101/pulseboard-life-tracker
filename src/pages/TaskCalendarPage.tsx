@@ -115,17 +115,31 @@ const TaskCalendarPage = () => {
         console.log('Transformed tasks:', transformedTasks);
         console.log('Sample task dates:', transformedTasks.slice(0, 3).map(t => ({ id: t.id, date: t.date, title: t.title })));
         
+        // Sort tasks by date (ascending) then by name (ascending) for better testing
+        const sortedTasks = transformedTasks.sort((a, b) => {
+          // First sort by date
+          if (a.date && b.date) {
+            const dateCompare = a.date.localeCompare(b.date);
+            if (dateCompare !== 0) return dateCompare;
+          } else if (a.date && !b.date) return -1;
+          else if (!a.date && b.date) return 1;
+          
+          // If dates are equal or both null, sort by name
+          return a.title.localeCompare(b.title);
+        });
+        console.log('Sorted tasks (first 5):', sortedTasks.slice(0, 5).map(t => ({ date: t.date, title: t.title })));
+        
         // Apply view-specific filtering
         let filteredTasks;
         if (taskView === 'tasks') {
           // For "Other Tasks" view, only show tasks without dates
-          filteredTasks = transformedTasks.filter(task => !task.date);
+          filteredTasks = sortedTasks.filter(task => !task.date);
         } else if (taskView === 'weekly') {
           // For weekly view, filter tasks within the week (Sunday to Saturday)
           const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 }); // Sunday = 0
           const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 }); // Saturday = 6
           
-          filteredTasks = transformedTasks.filter(task => {
+          filteredTasks = sortedTasks.filter(task => {
             if (!task.date) return false; // Exclude tasks without dates in weekly view
             const taskDate = new Date(task.date);
             return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
@@ -135,7 +149,7 @@ const TaskCalendarPage = () => {
           const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
           console.log('Current selected date:', selectedDate);
           console.log('Filtering tasks for date:', selectedDateStr);
-          filteredTasks = transformedTasks.filter(task => {
+          filteredTasks = sortedTasks.filter(task => {
             if (!task.date) return false; // Exclude tasks without dates in daily view
             console.log('Task date:', task.date, 'Selected date:', selectedDateStr, 'Match:', task.date === selectedDateStr);
             return task.date === selectedDateStr;
@@ -143,6 +157,7 @@ const TaskCalendarPage = () => {
         }
         
         console.log('Final filtered tasks:', filteredTasks);
+        console.log('Task summary - Total:', sortedTasks.length, 'Filtered:', filteredTasks.length, 'View:', taskView);
         setTasks(filteredTasks);
       } else {
         // No real tasks found, set empty array
