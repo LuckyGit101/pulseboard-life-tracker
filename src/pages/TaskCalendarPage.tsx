@@ -6,7 +6,7 @@ import TaskList from '@/components/tasks/TaskList';
 import TaskForm from '@/components/tasks/TaskForm';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { STANDARD_CATEGORIES, TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
+import { TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
 import { apiClient, Task } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -61,8 +61,8 @@ const transformPointsToBackend = (points: Record<string, number> | undefined): R
 const TaskCalendarPage = () => {
   const { isAuthenticated } = useAuth();
   const [calendarView, setCalendarView] = useState<'monthly' | 'weekly'>('monthly');
-  const [taskView, setTaskView] = useState<'daily' | 'weekly' | 'tasks'>('tasks');
-  const [selectedDate, setSelectedDate] = useState(new Date(2025, 7, 1)); // August 1, 2025 (where the recurring tasks start)
+  const [taskView, setTaskView] = useState<'daily' | 'weekly' | 'tasks'>('daily');
+  const [selectedDate, setSelectedDate] = useState(new Date(2025, 8, 1)); // September 1, 2025 (where the current tasks are)
   const [tasks, setTasks] = useState<typeof emptyTasks>([]); // Start empty, load based on auth status
   const [loading, setLoading] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -88,38 +88,29 @@ const TaskCalendarPage = () => {
       let apiResponse;
       if (taskView === 'tasks') {
         // For "Other Tasks" view, get all tasks without date filter
-        console.log('Loading all tasks (Other Tasks view)');
         apiResponse = await apiClient.getTasks({
           view: 'tasks'
         });
       } else if (taskView === 'weekly') {
         // For weekly view, get all tasks and filter by week range
-        console.log('Loading weekly tasks');
         apiResponse = await apiClient.getTasks({
           view: 'weekly'
         });
       } else {
-        // For daily view, get ALL tasks first, then filter by date on frontend
-        // This ensures we get recurring tasks that might not be returned by date-specific API calls
-        console.log('Loading all tasks for daily filtering');
+        // For daily view, get tasks for the specific selected date
         apiResponse = await apiClient.getTasks({
-          view: 'tasks' // Get all tasks, we'll filter by date on frontend
+          date: format(selectedDate, 'yyyy-MM-dd')
         });
       }
       
-       // Check if we have real tasks from API
-       console.log('API Response:', apiResponse);
-       if (apiResponse && apiResponse.length > 0) {
+      if (apiResponse && apiResponse.length > 0) {
         // Transform API tasks to match UI structure
         const transformedTasks = apiResponse.map(transformApiTask);
-        console.log('Transformed tasks:', transformedTasks);
-        console.log('Sample task dates:', transformedTasks.slice(0, 3).map(t => ({ id: t.id, date: t.date, title: t.title })));
         
-        // Sort tasks by date (ascending) then by name (ascending) for better testing
+        // Sort tasks by date (ascending) then by name (ascending)
         const sortedTasks = transformedTasks.sort((a, b) => {
           // First sort by date (ascending - earliest first)
           if (a.date && b.date) {
-            // Convert to Date objects for proper comparison
             const dateA = new Date(a.date);
             const dateB = new Date(b.date);
             const dateCompare = dateA.getTime() - dateB.getTime();
@@ -130,8 +121,6 @@ const TaskCalendarPage = () => {
           // If dates are equal or both null, sort by name (ascending)
           return a.title.localeCompare(b.title);
         });
-        console.log('Sorted tasks (first 5):', sortedTasks.slice(0, 5).map(t => ({ date: t.date, title: t.title })));
-        console.log('Sorted tasks (last 5):', sortedTasks.slice(-5).map(t => ({ date: t.date, title: t.title })));
         
         // Apply view-specific filtering
         let filteredTasks;
@@ -140,31 +129,21 @@ const TaskCalendarPage = () => {
           filteredTasks = sortedTasks.filter(task => !task.date);
         } else if (taskView === 'weekly') {
           // For weekly view, filter tasks within the week (Sunday to Saturday)
-          const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 }); // Sunday = 0
-          const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 }); // Saturday = 6
+          const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
+          const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 });
           
           filteredTasks = sortedTasks.filter(task => {
-            if (!task.date) return false; // Exclude tasks without dates in weekly view
+            if (!task.date) return false;
             const taskDate = new Date(task.date);
             return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
           });
         } else {
-          // For daily view, filter tasks by selected date
-          const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
-          console.log('Current selected date:', selectedDate);
-          console.log('Filtering tasks for date:', selectedDateStr);
-          filteredTasks = sortedTasks.filter(task => {
-            if (!task.date) return false; // Exclude tasks without dates in daily view
-            console.log('Task date:', task.date, 'Selected date:', selectedDateStr, 'Match:', task.date === selectedDateStr);
-            return task.date === selectedDateStr;
-          });
+          // For daily view, tasks are already filtered by the API call
+          filteredTasks = sortedTasks;
         }
         
-        console.log('Final filtered tasks:', filteredTasks);
-        console.log('Task summary - Total:', sortedTasks.length, 'Filtered:', filteredTasks.length, 'View:', taskView);
         setTasks(filteredTasks);
       } else {
-        // No real tasks found, set empty array
         setTasks([]);
       }
     } catch (error) {
@@ -313,7 +292,6 @@ const TaskCalendarPage = () => {
 
   const getFilteredTasks = () => {
     // Tasks are already filtered based on the current view in loadTasks
-    console.log('getFilteredTasks called, returning:', tasks.length, 'tasks');
     return tasks;
   };
 
@@ -384,14 +362,24 @@ const TaskCalendarPage = () => {
                   <h3 className={TYPOGRAPHY.cardTitle}>Task Management</h3>
                   <p className={TYPOGRAPHY.bodyText}>View and manage your daily tasks</p>
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setSelectedDate(new Date(2025, 7, 1))}
-                  className="text-xs"
-                >
-                  Go to Tasks
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setSelectedDate(new Date(2025, 8, 1))}
+                    className="text-xs"
+                  >
+                    Go to Tasks
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setSelectedDate(new Date(2025, 8, 1))}
+                    className="text-xs"
+                  >
+                    Sep 1st
+                  </Button>
+                </div>
               </div>
               
               <ToggleTabs

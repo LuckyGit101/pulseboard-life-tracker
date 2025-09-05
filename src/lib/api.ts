@@ -219,7 +219,6 @@ class ApiClient {
       }
 
       const data = await response.json();
-      console.log('API Response Data:', data);
 
       if (!response.ok) {
         throw new Error(data.message || data.error || `HTTP ${response.status}`);
@@ -303,7 +302,8 @@ class ApiClient {
     const endpoint = `/tasks${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     const response = await this.request<{ items: Task[]; total: number; page: number; limit: number; hasMore: boolean }>(endpoint);
     
-    // Extract the items array from the paginated response
+    // Backend returns { success: true, data: { items: [...] } }
+    // Extract the items array from the nested data structure
     return response.data?.items || [];
   }
 
