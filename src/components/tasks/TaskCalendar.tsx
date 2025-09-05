@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -31,7 +31,12 @@ interface TaskCalendarProps {
 }
 
 const TaskCalendar = ({ view, selectedDate, onDateSelect, tasks }: TaskCalendarProps) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(selectedDate);
+
+  // Update currentDate when selectedDate changes
+  useEffect(() => {
+    setCurrentDate(selectedDate);
+  }, [selectedDate]);
 
   // Dummy meetings for demonstration
   const dummyMeetings: Meeting[] = [

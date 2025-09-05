@@ -61,8 +61,8 @@ const transformPointsToBackend = (points: Record<string, number> | undefined): R
 const TaskCalendarPage = () => {
   const { isAuthenticated } = useAuth();
   const [calendarView, setCalendarView] = useState<'monthly' | 'weekly'>('monthly');
-  const [taskView, setTaskView] = useState<'daily' | 'weekly' | 'tasks'>('daily');
-  const [selectedDate, setSelectedDate] = useState(new Date(2025, 7, 24)); // August 24, 2025 (where the recurring task was created)
+  const [taskView, setTaskView] = useState<'daily' | 'weekly' | 'tasks'>('tasks');
+  const [selectedDate, setSelectedDate] = useState(new Date(2025, 7, 1)); // August 1, 2025 (where the recurring tasks start)
   const [tasks, setTasks] = useState<typeof emptyTasks>([]); // Start empty, load based on auth status
   const [loading, setLoading] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -88,27 +88,32 @@ const TaskCalendarPage = () => {
       let apiResponse;
       if (taskView === 'tasks') {
         // For "Other Tasks" view, get all tasks without date filter
+        console.log('Loading all tasks (Other Tasks view)');
         apiResponse = await apiClient.getTasks({
           view: 'tasks'
         });
       } else if (taskView === 'weekly') {
         // For weekly view, get all tasks and filter by week range
+        console.log('Loading weekly tasks');
         apiResponse = await apiClient.getTasks({
           view: 'weekly'
         });
       } else {
-        // For daily view, get tasks for specific date
-        const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+        // For daily view, get ALL tasks first, then filter by date on frontend
+        // This ensures we get recurring tasks that might not be returned by date-specific API calls
+        console.log('Loading all tasks for daily filtering');
         apiResponse = await apiClient.getTasks({
-          date: selectedDateStr,
-          view: 'daily'
+          view: 'tasks' // Get all tasks, we'll filter by date on frontend
         });
       }
       
        // Check if we have real tasks from API
+       console.log('API Response:', apiResponse);
        if (apiResponse && apiResponse.length > 0) {
         // Transform API tasks to match UI structure
         const transformedTasks = apiResponse.map(transformApiTask);
+        console.log('Transformed tasks:', transformedTasks);
+        console.log('Sample task dates:', transformedTasks.slice(0, 3).map(t => ({ id: t.id, date: t.date, title: t.title })));
         
         // Apply view-specific filtering
         let filteredTasks;
@@ -126,10 +131,18 @@ const TaskCalendarPage = () => {
             return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
           });
         } else {
-          // For daily view, show all tasks (already filtered by date in API)
-          filteredTasks = transformedTasks;
+          // For daily view, filter tasks by selected date
+          const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
+          console.log('Current selected date:', selectedDate);
+          console.log('Filtering tasks for date:', selectedDateStr);
+          filteredTasks = transformedTasks.filter(task => {
+            if (!task.date) return false; // Exclude tasks without dates in daily view
+            console.log('Task date:', task.date, 'Selected date:', selectedDateStr, 'Match:', task.date === selectedDateStr);
+            return task.date === selectedDateStr;
+          });
         }
         
+        console.log('Final filtered tasks:', filteredTasks);
         setTasks(filteredTasks);
       } else {
         // No real tasks found, set empty array
@@ -281,6 +294,7 @@ const TaskCalendarPage = () => {
 
   const getFilteredTasks = () => {
     // Tasks are already filtered based on the current view in loadTasks
+    console.log('getFilteredTasks called, returning:', tasks.length, 'tasks');
     return tasks;
   };
 
@@ -351,6 +365,14 @@ const TaskCalendarPage = () => {
                   <h3 className={TYPOGRAPHY.cardTitle}>Task Management</h3>
                   <p className={TYPOGRAPHY.bodyText}>View and manage your daily tasks</p>
                 </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setSelectedDate(new Date(2025, 7, 1))}
+                  className="text-xs"
+                >
+                  Go to Tasks
+                </Button>
               </div>
               
               <ToggleTabs
