@@ -117,17 +117,21 @@ const TaskCalendarPage = () => {
         
         // Sort tasks by date (ascending) then by name (ascending) for better testing
         const sortedTasks = transformedTasks.sort((a, b) => {
-          // First sort by date
+          // First sort by date (ascending - earliest first)
           if (a.date && b.date) {
-            const dateCompare = a.date.localeCompare(b.date);
+            // Convert to Date objects for proper comparison
+            const dateA = new Date(a.date);
+            const dateB = new Date(b.date);
+            const dateCompare = dateA.getTime() - dateB.getTime();
             if (dateCompare !== 0) return dateCompare;
           } else if (a.date && !b.date) return -1;
           else if (!a.date && b.date) return 1;
           
-          // If dates are equal or both null, sort by name
+          // If dates are equal or both null, sort by name (ascending)
           return a.title.localeCompare(b.title);
         });
         console.log('Sorted tasks (first 5):', sortedTasks.slice(0, 5).map(t => ({ date: t.date, title: t.title })));
+        console.log('Sorted tasks (last 5):', sortedTasks.slice(-5).map(t => ({ date: t.date, title: t.title })));
         
         // Apply view-specific filtering
         let filteredTasks;
