@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import StatBar from '@/components/ui/stat-bar';
 import ToggleTabs from '@/components/ui/toggle-tabs';
-import { User, Trophy, Plus, Edit, Trash2, CheckCircle, Circle, RefreshCw } from 'lucide-react';
+import { User, Trophy, Plus, Edit, Trash2, CheckCircle, Circle, RefreshCw, X } from 'lucide-react';
 import { ChartContainer, ChartTooltipContent, ChartLegendContent } from '@/components/ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { format, subDays, startOfWeek, startOfMonth, isWithinInterval, parseISO } from 'date-fns';
@@ -11,6 +11,7 @@ import { TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
 import { useCategories } from '@/contexts/CategoryContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient, Goal, CreateGoalRequest } from '@/lib/api';
+import GoalForm from '@/components/goals/GoalForm';
 
 // Empty stats data for when no data is available
 const emptyStats = [
@@ -190,19 +191,6 @@ const ProgressPage = () => {
   const [loadingPoints, setLoadingPoints] = useState(false);
   const [pieTotals, setPieTotals] = useState<Record<string, number> | null>(null);
   
-  const [goalForm, setGoalForm] = useState(() => {
-    const initialCategories = taskCategories.reduce((acc, cat) => {
-      acc[cat.name] = { selected: false, points: '' };
-      return acc;
-    }, {} as Record<string, { selected: boolean; points: string }>);
-    
-    return {
-    title: '',
-    startDate: '',
-    endDate: '',
-      categories: initialCategories
-    };
-  });
 
   // Load goals based on authentication status
   useEffect(() => {
@@ -340,50 +328,27 @@ const ProgressPage = () => {
     pieData = getPieData(filteredPieData);
   }
 
-  const handleCreateGoal = async () => {
-    if (!goalForm.title.trim()) return;
-
-    const selectedCategories = Object.entries(goalForm.categories)
-      .filter(([_, { selected }]) => selected)
-      .reduce((acc, [category, { points }]) => {
-        const numeric = Math.max(0, Math.min(10, Math.floor(Number(points) || 0)));
-        acc[category.toLowerCase()] = numeric;
-        return acc;
-      }, {} as Record<string, number>);
-
-    // Ensure at least one category is selected
-    if (Object.keys(selectedCategories).length === 0) {
-      alert('Please select at least one category for your goal.');
-      return;
-    }
-
-    const goalData = {
-      name: goalForm.title,
-      description: `Goal: ${goalForm.title}`,
-      startDate: goalForm.startDate || undefined,
-      targetDate: goalForm.endDate,
-      category: Object.keys(selectedCategories)[0] || 'health', // Use first selected category
-      points: selectedCategories
-    };
-
+  const handleCreateGoal = async (goalData: any) => {
     try {
       if (isAuthenticated) {
         const newGoal = await apiClient.createGoal(goalData);
         setGoals(prev => [...prev, newGoal]);
+        // Immediately reload goals to ensure proper formatting
+        await loadGoals();
       } else {
         // Demo mode - create mock goal
         const newGoal = {
           id: Date.now().toString(),
-          name: goalForm.title,
-          description: `Goal: ${goalForm.title}`,
-          startDate: goalForm.startDate || undefined,
-          targetDate: goalForm.endDate,
-          category: Object.keys(selectedCategories)[0] || 'health',
+          name: goalData.name,
+          description: goalData.description,
+          startDate: goalData.startDate || undefined,
+          targetDate: goalData.targetDate,
+          category: goalData.category,
           progress: 0,
           status: 'active' as const,
           currentValue: 0,
-          targetValue: Object.values(selectedCategories).reduce((sum, points) => sum + points, 0),
-          points: selectedCategories,
+          targetValue: Object.values(goalData.points).reduce((sum: number, points: any) => sum + points, 0),
+          points: goalData.points,
           userId: 'demo',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -392,17 +357,6 @@ const ProgressPage = () => {
       }
       
       setIsCreatingGoal(false);
-      const resetCategories = taskCategories.reduce((acc, cat) => {
-        acc[cat.name] = { selected: false, points: '' };
-        return acc;
-      }, {} as Record<string, { selected: boolean; points: string }>);
-      
-      setGoalForm({
-        title: '',
-        startDate: '',
-        endDate: '',
-        categories: resetCategories
-      });
     } catch (error) {
       console.error('Failed to create goal:', error);
     }
@@ -444,44 +398,8 @@ const ProgressPage = () => {
 
   const handleCancelGoal = () => {
     setIsCreatingGoal(false);
-    const resetCategories = taskCategories.reduce((acc, cat) => {
-      acc[cat.name] = { selected: false, points: '' };
-      return acc;
-    }, {} as Record<string, { selected: boolean; points: string }>);
-    
-    setGoalForm({
-      title: '',
-      startDate: '',
-      endDate: '',
-      categories: resetCategories
-    });
   };
 
-  const handleCategoryChange = (category: string, selected: boolean) => {
-    setGoalForm(prev => ({
-      ...prev,
-      categories: {
-        ...prev.categories,
-        [category]: { ...prev.categories[category], selected }
-      }
-    }));
-  };
-
-  const handlePointsChange = (category: string, points: string) => {
-    // Sanitize: allow empty while typing; otherwise clamp 0-10 and integers only
-    let sanitized = points;
-    if (sanitized !== '') {
-      const numeric = Math.max(0, Math.min(10, Math.floor(Number(sanitized) || 0)));
-      sanitized = String(numeric);
-    }
-    setGoalForm(prev => ({
-      ...prev,
-      categories: {
-        ...prev.categories,
-        [category]: { ...prev.categories[category], points: sanitized }
-      }
-    }));
-  };
 
   const getCategoryColor = (category: string) => {
     switch (category) {
@@ -896,7 +814,7 @@ const ProgressPage = () => {
               </Button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {goals && Array.isArray(goals) && goals.map((goal) => {
                 // Use backend-calculated progress or calculate from goal data
                 const goalCategory = (goal.category || 'health').toLowerCase();
@@ -909,31 +827,31 @@ const ProgressPage = () => {
                 return (
                   <div
                     key={goal.id}
-                    className={`p-6 rounded-xl border-2 transition-all duration-200 ${getGoalBackground(goal)}`}
+                    className={`p-4 rounded-xl border-2 transition-all duration-200 ${getGoalBackground(goal)}`}
                   >
-                    <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <h4 className="text-lg font-semibold text-gray-900">{goal.name}</h4>
+                          <h4 className="text-base font-semibold text-gray-900">{goal.name}</h4>
                           {isCompleted && (
                             <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">
                               ✓ Completed
                             </span>
                           )}
                         </div>
-                        <p className="text-gray-600 mb-3">{goal.description}</p>
+                        <p className="text-sm text-gray-600 mb-2">{goal.description}</p>
                         
                         {/* Progress Bar */}
-                        <div className="mb-3">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium text-gray-700">Progress</span>
-                            <span className="text-sm font-semibold text-gray-900">
+                        <div className="mb-2">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-xs font-medium text-gray-700">Progress</span>
+                            <span className="text-xs font-semibold text-gray-900">
                               {Math.round(progress)}%
                             </span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
-                              className={`h-3 rounded-full transition-all duration-300 ${
+                              className={`h-2 rounded-full transition-all duration-300 ${
                                 isCompleted
                                   ? 'bg-gradient-to-r from-yellow-400 to-amber-500'
                                   : progress >= 50
@@ -946,14 +864,14 @@ const ProgressPage = () => {
                         </div>
                         
                         {/* Categories and Points */}
-                        <div className="flex flex-wrap gap-2 mb-3">
+                        <div className="flex flex-wrap gap-1 mb-2">
                           {goal.points && Object.entries(goal.points).map(([category, points]) => (
                             <div
                               key={category}
-                              className="flex items-center gap-2 bg-white/50 px-3 py-1 rounded-full border border-gray-200"
+                              className="flex items-center gap-1 bg-white/50 px-2 py-1 rounded-full border border-gray-200"
                             >
-                              <span className="text-sm font-medium text-gray-700 capitalize">{category}</span>
-                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                              <span className="text-xs font-medium text-gray-700 capitalize">{category}</span>
+                              <span className="text-xs bg-gray-100 text-gray-600 px-1 py-0.5 rounded-full">
                                 {currentPoints}/{points} pts
                               </span>
                             </div>
@@ -962,22 +880,22 @@ const ProgressPage = () => {
                       </div>
                       
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-2 ml-4">
+                      <div className="flex items-center gap-1 ml-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {/* Handle edit */}}
-                          className="text-gray-600 hover:text-gray-800"
+                          className="text-gray-600 hover:text-gray-800 h-8 w-8 p-0"
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="h-3 w-3" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleDeleteGoal(goal.id)}
-                          className="text-red-600 hover:text-red-800"
+                          className="text-red-600 hover:text-red-800 h-8 w-8 p-0"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
@@ -992,98 +910,21 @@ const ProgressPage = () => {
             </div>
           )}
 
-          {/* Goal Creation Form */}
+          {/* Goal Creation Modal */}
           {isCreatingGoal && (
-            <div className="mt-6 p-6 bg-gray-50 rounded-lg border border-gray-200">
-              <h4 className="text-lg font-semibold mb-4">Create New Goal</h4>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Goal Title</label>
-                    <input
-                      type="text"
-                      value={goalForm.title}
-                      onChange={(e) => setGoalForm(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="e.g., Summer Fitness Challenge"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
-                  
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date (Optional)</label>
-                    <input
-                      type="date"
-                      value={goalForm.startDate}
-                      onChange={(e) => setGoalForm(prev => ({ ...prev, startDate: e.target.value }))}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">End Date (Required)</label>
-                    <input
-                      type="date"
-                      value={goalForm.endDate}
-                      onChange={(e) => setGoalForm(prev => ({ ...prev, endDate: e.target.value }))}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
-                  </div>
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl p-6 shadow-xl w-[90vw] max-w-2xl max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold">Create New Goal</h3>
+                  <Button variant="ghost" size="sm" onClick={handleCancelGoal}>
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">Categories & Point Targets</label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {Object.entries(goalForm.categories).map(([category, { selected, points }]) => (
-                      <div key={category} className={`flex items-center gap-3 p-4 border rounded-lg transition-all duration-200 ${
-                        selected ? 'border-blue-300 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}>
-                        <input
-                          type="checkbox"
-                          id={`category-${category}`}
-                          checked={selected}
-                          onChange={(e) => handleCategoryChange(category, e.target.checked)}
-                          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                        <label htmlFor={`category-${category}`} className="flex-1 text-sm font-medium text-gray-700 cursor-pointer">
-                          {category}
-                        </label>
-                        {selected && (
-                          <input
-                            type="number"
-                            placeholder="Points"
-                            value={points}
-                            min={0}
-                            max={10}
-                            step={1}
-                            onChange={(e) => handlePointsChange(category, e.target.value)}
-                            className="w-24 p-2 bg-white border border-gray-300 text-gray-700 text-sm rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            required
-                          />
-                        )}
-                      </div>
-                    ))}
-                </div>
+                <GoalForm
+                  onSave={handleCreateGoal}
+                  onCancel={handleCancelGoal}
+                />
               </div>
-
-                <div className="flex gap-3 pt-4">
-                <Button
-                  onClick={handleCreateGoal}
-                    disabled={!goalForm.title || !goalForm.endDate}
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:scale-105 transition-all duration-200"
-                >
-                  Create Goal
-                </Button>
-                <Button
-                  onClick={handleCancelGoal}
-                  variant="outline"
-                    className="hover:scale-105 transition-all duration-200"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
             </div>
           )}
         </Card>

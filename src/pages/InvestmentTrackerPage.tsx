@@ -83,17 +83,40 @@ const InvestmentTrackerPage = () => {
 
   const { totalInvestment, totalReturn, totalValue, overallReturn } = calculatePortfolioMetrics(investments);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Reset form
-    setFormData({
-      name: '',
-      amount: '',
-      type: '',
-      date: new Date().toISOString().split('T')[0]
-    });
-    setShowForm(false);
-    setEditingInvestment(null);
+    
+    if (!formData.name || !formData.amount || !formData.type) {
+      return;
+    }
+
+    try {
+      if (isAuthenticated) {
+        const investmentData = {
+          name: formData.name,
+          amount: parseFloat(formData.amount),
+          type: formData.type,
+          date: formData.date,
+          currentValue: parseFloat(formData.amount), // Default current value to amount
+          notes: undefined
+        };
+        
+        await apiClient.createInvestment(investmentData);
+        await loadInvestments(); // Reload investments
+      }
+      
+      // Reset form
+      setFormData({
+        name: '',
+        amount: '',
+        type: '',
+        date: new Date().toISOString().split('T')[0]
+      });
+      setShowForm(false);
+      setEditingInvestment(null);
+    } catch (error) {
+      console.error('Error creating investment:', error);
+    }
   };
 
   const handleEdit = (investment: typeof emptyInvestments[0]) => {
@@ -107,8 +130,15 @@ const InvestmentTrackerPage = () => {
     setShowForm(true);
   };
 
-  const handleDelete = (id: string) => {
-    // Delete investment logic would go here
+  const handleDelete = async (id: string) => {
+    try {
+      if (isAuthenticated) {
+        await apiClient.deleteInvestment(id);
+        await loadInvestments(); // Reload investments
+      }
+    } catch (error) {
+      console.error('Error deleting investment:', error);
+    }
   };
 
   const handleCancel = () => {

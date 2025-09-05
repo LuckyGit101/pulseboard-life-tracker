@@ -7,8 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import ToggleTabs from '@/components/ui/toggle-tabs';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { DollarSign, TrendingDown, TrendingUp, Plus, Calendar, Home, Car, Heart, Zap, User, Utensils, PiggyBank, Clock } from 'lucide-react';
+import { DollarSign, TrendingDown, TrendingUp, Plus, Calendar, Home, Car, Heart, Zap, User, Utensils, PiggyBank, Clock, Trash2 } from 'lucide-react';
 import { TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
 import { apiClient, Expense } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,24 +17,6 @@ import { useCategories } from '@/contexts/CategoryContext';
 // Empty data structures for when no data is available
 const emptyExpenseData = [];
 const emptyIncomeData = [];
-const emptyTrendData = [
-  { month: 'Jan', income: 0, expenses: 0, investments: 0, tasks: 0 },
-  { month: 'Feb', income: 0, expenses: 0, investments: 0, tasks: 0 },
-  { month: 'Mar', income: 0, expenses: 0, investments: 0, tasks: 0 },
-  { month: 'Apr', income: 0, expenses: 0, investments: 0, tasks: 0 },
-  { month: 'May', income: 0, expenses: 0, investments: 0, tasks: 0 },
-  { month: 'Jun', income: 0, expenses: 0, investments: 0, tasks: 0 }
-];
-
-// Empty expense breakdown for charts
-const emptyExpenseBreakdown = [
-  { name: 'Food', value: 0, color: '#10b981' },
-  { name: 'Transport', value: 0, color: '#3b82f6' },
-  { name: 'Shopping', value: 0, color: '#8b5cf6' },
-  { name: 'Utilities', value: 0, color: '#f59e0b' },
-  { name: 'Entertainment', value: 0, color: '#ef4444' },
-  { name: 'Health', value: 0, color: '#06b6d4' }
-];
 
 // Income categories
 const INCOME_CATEGORIES = {
@@ -51,8 +32,11 @@ const ExpenseTrackerPage = () => {
   const { getByType } = useCategories();
   const expenseCategories = getByType('expense');
   const [entryType, setEntryType] = useState<'expense' | 'income'>('expense');
+  const [viewType, setViewType] = useState<'expense' | 'income'>('expense');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [plannedValues, setPlannedValues] = useState<Record<string, Record<string, number>>>({});
   const [formData, setFormData] = useState({
     name: '',
     amount: '',
@@ -93,6 +77,277 @@ const ExpenseTrackerPage = () => {
       setLoading(false);
     }
   };
+
+
+  // Calculate monthly summary from actual expense data
+  const calculateMonthlySummary = (targetMonth?: Date) => {
+    if (!expenses || expenses.length === 0) {
+      return {
+        mainCategories: [
+          { 
+            name: 'Income', 
+            planned: 0,
+            actual: 0,
+            threeMonthAvg: 0, 
+            oneYearAvg: 0,
+            type: 'income',
+            icon: DollarSign
+          },
+          { 
+            name: 'Investments', 
+            planned: 0, 
+            actual: 0, 
+            threeMonthAvg: 0, 
+            oneYearAvg: 0,
+            type: 'income',
+            icon: PiggyBank
+          },
+          { 
+            name: 'Expenses', 
+            planned: 0,
+            actual: 0,
+            threeMonthAvg: 0, 
+            oneYearAvg: 0,
+            type: 'expense',
+            icon: TrendingDown
+          }
+        ],
+        expenseCategories: [
+          { 
+            name: 'Food', 
+            planned: 0, 
+            actual: 0, 
+            threeMonthAvg: 0, 
+            oneYearAvg: 0,
+            icon: Utensils
+          },
+          { 
+            name: 'Housing', 
+            planned: 0, 
+            actual: 0, 
+            threeMonthAvg: 0, 
+            oneYearAvg: 0,
+            icon: Home
+          },
+          { 
+            name: 'Transport', 
+            planned: 0, 
+            actual: 0, 
+            threeMonthAvg: 0, 
+            oneYearAvg: 0,
+            icon: Car
+          },
+          { 
+            name: 'Health', 
+            planned: 0, 
+            actual: 0, 
+            threeMonthAvg: 0, 
+            oneYearAvg: 0,
+            icon: Heart
+          },
+          { 
+            name: 'Utilities', 
+            planned: 0, 
+            actual: 0, 
+            threeMonthAvg: 0, 
+            oneYearAvg: 0,
+            icon: Zap
+          },
+          { 
+            name: 'Shopping', 
+            planned: 0, 
+            actual: 0, 
+            threeMonthAvg: 0, 
+            oneYearAvg: 0,
+            icon: User
+          }
+        ]
+      };
+    }
+
+    const targetDate = targetMonth || selectedMonth;
+    const currentMonth = targetDate.getMonth();
+    const currentYear = targetDate.getFullYear();
+    
+    // Get month key for planned values
+    const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+    
+    // Helper function to get expenses for a specific month
+    const getExpensesForMonth = (year: number, month: number) => {
+      return expenses.filter(expense => {
+        const expenseDate = new Date(expense.date);
+        return expenseDate.getMonth() === month && expenseDate.getFullYear() === year;
+      });
+    };
+
+    // Helper function to calculate totals for a month
+    const calculateMonthTotals = (monthExpenses: any[]) => {
+      const income = monthExpenses
+        .filter(expense => expense.type === 'income')
+        .reduce((sum, expense) => sum + expense.amount, 0);
+      
+      const expenseTotal = Math.abs(monthExpenses
+        .filter(expense => expense.type === 'expense')
+        .reduce((sum, expense) => sum + expense.amount, 0));
+
+      return { income, expenseTotal };
+    };
+
+    // Helper function to calculate category totals for a month
+    const calculateCategoryTotals = (monthExpenses: any[]) => {
+      const categoryTotals: Record<string, number> = {};
+      monthExpenses
+        .filter(expense => expense.type === 'expense')
+        .forEach(expense => {
+          const category = expense.category;
+          const amount = Math.abs(expense.amount);
+          categoryTotals[category] = (categoryTotals[category] || 0) + amount;
+        });
+      return categoryTotals;
+    };
+
+    // Current month data
+    const currentMonthExpenses = getExpensesForMonth(currentYear, currentMonth);
+    const currentTotals = calculateMonthTotals(currentMonthExpenses);
+    const currentCategoryTotals = calculateCategoryTotals(currentMonthExpenses);
+
+    // Calculate 3-month averages
+    const threeMonthTotals = { income: 0, expenseTotal: 0 };
+    const threeMonthCategoryTotals: Record<string, number> = {};
+    let threeMonthCount = 0;
+
+    for (let i = 0; i < 3; i++) {
+      const monthDate = new Date(currentYear, currentMonth - i, 1);
+      const monthExpenses = getExpensesForMonth(monthDate.getFullYear(), monthDate.getMonth());
+      
+      if (monthExpenses.length > 0) {
+        const monthTotals = calculateMonthTotals(monthExpenses);
+        const monthCategoryTotals = calculateCategoryTotals(monthExpenses);
+        
+        threeMonthTotals.income += monthTotals.income;
+        threeMonthTotals.expenseTotal += monthTotals.expenseTotal;
+        
+        Object.keys(monthCategoryTotals).forEach(category => {
+          threeMonthCategoryTotals[category] = (threeMonthCategoryTotals[category] || 0) + monthCategoryTotals[category];
+        });
+        
+        threeMonthCount++;
+      }
+    }
+
+    // Calculate 1-year averages
+    const oneYearTotals = { income: 0, expenseTotal: 0 };
+    const oneYearCategoryTotals: Record<string, number> = {};
+    let oneYearCount = 0;
+
+    for (let i = 0; i < 12; i++) {
+      const monthDate = new Date(currentYear, currentMonth - i, 1);
+      const monthExpenses = getExpensesForMonth(monthDate.getFullYear(), monthDate.getMonth());
+      
+      if (monthExpenses.length > 0) {
+        const monthTotals = calculateMonthTotals(monthExpenses);
+        const monthCategoryTotals = calculateCategoryTotals(monthExpenses);
+        
+        oneYearTotals.income += monthTotals.income;
+        oneYearTotals.expenseTotal += monthTotals.expenseTotal;
+        
+        Object.keys(monthCategoryTotals).forEach(category => {
+          oneYearCategoryTotals[category] = (oneYearCategoryTotals[category] || 0) + monthCategoryTotals[category];
+        });
+        
+        oneYearCount++;
+      }
+    }
+
+    // Calculate averages (only divide by months that have data)
+    const threeMonthAvgIncome = threeMonthCount > 0 ? threeMonthTotals.income / threeMonthCount : 0;
+    const threeMonthAvgExpenses = threeMonthCount > 0 ? threeMonthTotals.expenseTotal / threeMonthCount : 0;
+    const oneYearAvgIncome = oneYearCount > 0 ? oneYearTotals.income / oneYearCount : 0;
+    const oneYearAvgExpenses = oneYearCount > 0 ? oneYearTotals.expenseTotal / oneYearCount : 0;
+
+    return {
+      mainCategories: [
+        { 
+          name: 'Income', 
+          planned: plannedValues[monthKey]?.Income || 0,
+          actual: currentTotals.income,
+          threeMonthAvg: Math.round(threeMonthAvgIncome), 
+          oneYearAvg: Math.round(oneYearAvgIncome),
+          type: 'income',
+          icon: DollarSign
+        },
+        { 
+          name: 'Investments', 
+          planned: plannedValues[monthKey]?.Investments || 0, 
+          actual: 0, // No investment data available
+          threeMonthAvg: 0, 
+          oneYearAvg: 0,
+          type: 'income',
+          icon: PiggyBank
+        },
+        { 
+          name: 'Expenses', 
+          planned: plannedValues[monthKey]?.Expenses || 0,
+          actual: currentTotals.expenseTotal,
+          threeMonthAvg: Math.round(threeMonthAvgExpenses), 
+          oneYearAvg: Math.round(oneYearAvgExpenses),
+          type: 'expense',
+          icon: TrendingDown
+        }
+      ],
+      expenseCategories: [
+        { 
+          name: 'Food', 
+          planned: plannedValues[monthKey]?.Food || 0, 
+          actual: currentCategoryTotals['Food'] || 0, 
+          threeMonthAvg: Math.round((threeMonthCategoryTotals['Food'] || 0) / Math.max(threeMonthCount, 1)), 
+          oneYearAvg: Math.round((oneYearCategoryTotals['Food'] || 0) / Math.max(oneYearCount, 1)),
+          icon: Utensils
+        },
+        { 
+          name: 'Housing', 
+          planned: plannedValues[monthKey]?.Housing || 0, 
+          actual: currentCategoryTotals['Housing'] || 0, 
+          threeMonthAvg: Math.round((threeMonthCategoryTotals['Housing'] || 0) / Math.max(threeMonthCount, 1)), 
+          oneYearAvg: Math.round((oneYearCategoryTotals['Housing'] || 0) / Math.max(oneYearCount, 1)),
+          icon: Home
+        },
+        { 
+          name: 'Transport', 
+          planned: plannedValues[monthKey]?.Transport || 0, 
+          actual: currentCategoryTotals['Transport'] || 0, 
+          threeMonthAvg: Math.round((threeMonthCategoryTotals['Transport'] || 0) / Math.max(threeMonthCount, 1)), 
+          oneYearAvg: Math.round((oneYearCategoryTotals['Transport'] || 0) / Math.max(oneYearCount, 1)),
+          icon: Car
+        },
+        { 
+          name: 'Health', 
+          planned: plannedValues[monthKey]?.Health || 0, 
+          actual: currentCategoryTotals['Health'] || 0, 
+          threeMonthAvg: Math.round((threeMonthCategoryTotals['Health'] || 0) / Math.max(threeMonthCount, 1)), 
+          oneYearAvg: Math.round((oneYearCategoryTotals['Health'] || 0) / Math.max(oneYearCount, 1)),
+          icon: Heart
+        },
+        { 
+          name: 'Utilities', 
+          planned: plannedValues[monthKey]?.Utilities || 0, 
+          actual: currentCategoryTotals['Utilities'] || 0, 
+          threeMonthAvg: Math.round((threeMonthCategoryTotals['Utilities'] || 0) / Math.max(threeMonthCount, 1)), 
+          oneYearAvg: Math.round((oneYearCategoryTotals['Utilities'] || 0) / Math.max(oneYearCount, 1)),
+          icon: Zap
+        },
+        { 
+          name: 'Shopping', 
+          planned: plannedValues[monthKey]?.Shopping || 0, 
+          actual: currentCategoryTotals['Shopping'] || 0, 
+          threeMonthAvg: Math.round((threeMonthCategoryTotals['Shopping'] || 0) / Math.max(threeMonthCount, 1)), 
+          oneYearAvg: Math.round((oneYearCategoryTotals['Shopping'] || 0) / Math.max(oneYearCount, 1)),
+          icon: User
+        }
+      ]
+    };
+  };
+
   const [recurringExpenses, setRecurringExpenses] = useState([
     {
       id: '1',
@@ -151,32 +406,80 @@ const ExpenseTrackerPage = () => {
     });
   };
 
-  const monthlyData = {
+  // Handle view type change (for filtering the list)
+  const handleViewTypeChange = (value: string) => {
+    setViewType(value as 'expense' | 'income');
+  };
+
+  // Handle month navigation
+  const handleMonthChange = (direction: 'prev' | 'next') => {
+    const newMonth = new Date(selectedMonth);
+    if (direction === 'prev') {
+      newMonth.setMonth(newMonth.getMonth() - 1);
+    } else {
+      newMonth.setMonth(newMonth.getMonth() + 1);
+    }
+    setSelectedMonth(newMonth);
+  };
+
+  // Handle planned value updates
+  const handlePlannedValueChange = (category: string, value: string) => {
+    const monthKey = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}`;
+    const numValue = parseFloat(value) || 0;
+    
+    setPlannedValues(prev => ({
+      ...prev,
+      [monthKey]: {
+        ...prev[monthKey],
+        [category]: numValue
+      }
+    }));
+  };
+
+  // Handle delete expense/income
+  const handleDeleteExpense = async (id: string) => {
+    if (!isAuthenticated) {
+      // Demo mode: remove from local state
+      setExpenses(prev => prev.filter(expense => expense.id !== id));
+      return;
+    }
+
+    try {
+      await apiClient.deleteExpense(id);
+      // Reload expenses after deletion
+      await loadExpenses();
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+    }
+  };
+
+  // Use calculateMonthlySummary as primary source since it works with the correct data structure
+  const monthlyData = isAuthenticated ? calculateMonthlySummary(selectedMonth) : {
     mainCategories: [
       { 
         name: 'Income', 
-        planned: 140000,
-        actual: 145200,
-        threeMonthAvg: 142000, 
-        oneYearAvg: 138000,
+        planned: 0,
+        actual: 0,
+        threeMonthAvg: 0, 
+        oneYearAvg: 0,
         type: 'income',
         icon: DollarSign
       },
       { 
         name: 'Investments', 
-        planned: 25000, 
-        actual: 18000, 
-        threeMonthAvg: 22000, 
-        oneYearAvg: 20000,
+        planned: 0, 
+        actual: 0, 
+        threeMonthAvg: 0, 
+        oneYearAvg: 0,
         type: 'income',
         icon: PiggyBank
       },
       { 
         name: 'Expenses', 
-        planned: 68000,
-        actual: 64500,
-        threeMonthAvg: 65700, 
-        oneYearAvg: 67100,
+        planned: 0,
+        actual: 0,
+        threeMonthAvg: 0, 
+        oneYearAvg: 0,
         type: 'expense',
         icon: TrendingDown
       }
@@ -184,59 +487,59 @@ const ExpenseTrackerPage = () => {
     expenseCategories: [
       { 
         name: 'Food', 
-        planned: 15000, 
-        actual: 12800, 
-        threeMonthAvg: 13500, 
-        oneYearAvg: 14000,
+        planned: 0, 
+        actual: 0, 
+        threeMonthAvg: 0, 
+        oneYearAvg: 0,
         icon: Utensils
       },
       { 
         name: 'Home', 
-        planned: 35000, 
-        actual: 35000, 
-        threeMonthAvg: 35000, 
-        oneYearAvg: 34000,
+        planned: 0, 
+        actual: 0, 
+        threeMonthAvg: 0, 
+        oneYearAvg: 0,
         icon: Home
       },
       { 
         name: 'Transport', 
-        planned: 8000, 
-        actual: 6200, 
-        threeMonthAvg: 7000, 
-        oneYearAvg: 7500,
+        planned: 0, 
+        actual: 0, 
+        threeMonthAvg: 0, 
+        oneYearAvg: 0,
         icon: Car
       },
       { 
         name: 'Health', 
-        planned: 3000, 
-        actual: 2500, 
-        threeMonthAvg: 2800, 
-        oneYearAvg: 3000,
+        planned: 0, 
+        actual: 0, 
+        threeMonthAvg: 0, 
+        oneYearAvg: 0,
         icon: Heart
       },
       { 
         name: 'Utilities', 
-        planned: 4000, 
-        actual: 3800, 
-        threeMonthAvg: 3900, 
-        oneYearAvg: 4000,
+        planned: 0, 
+        actual: 0, 
+        threeMonthAvg: 0, 
+        oneYearAvg: 0,
         icon: Zap
       },
       { 
         name: 'Shopping', 
-        planned: 3000, 
-        actual: 4200, 
-        threeMonthAvg: 3500, 
-        oneYearAvg: 3200,
+        planned: 0, 
+        actual: 0, 
+        threeMonthAvg: 0, 
+        oneYearAvg: 0,
         icon: User
       }
     ]
   };
 
   // Get main categories data for progress bars
-  const incomeData = monthlyData.mainCategories.find(cat => cat.name === 'Income');
-  const investmentsData = monthlyData.mainCategories.find(cat => cat.name === 'Investments');
-  const expensesData = monthlyData.mainCategories.find(cat => cat.name === 'Expenses');
+  const incomeData = monthlyData?.mainCategories?.find(cat => cat.name === 'Income');
+  const investmentsData = monthlyData?.mainCategories?.find(cat => cat.name === 'Investments');
+  const expensesData = monthlyData?.mainCategories?.find(cat => cat.name === 'Expenses');
 
 
 
@@ -247,13 +550,14 @@ const ExpenseTrackerPage = () => {
     category: string,
     date: string
   ) => {
-    if (!amount || parseFloat(amount) <= 0 || !name.trim()) return;
+    if (!amount || parseFloat(amount) < 0.01 || !name.trim()) return;
 
     const expensePayload = {
       name,
-      amount: parseFloat(amount),
+      amount: -Math.abs(parseFloat(amount)), // Make expense negative
       category,
       date,
+      type: 'expense' as const,
       isRecurring: true,
       notes: undefined as string | undefined
     };
@@ -268,9 +572,10 @@ const ExpenseTrackerPage = () => {
           id: `mock-${Date.now()}`,
           userId: 'mock',
           name,
-          amount: parseFloat(amount),
+          amount: -Math.abs(parseFloat(amount)), // Make expense negative
           category,
           date,
+          type: 'expense',
           isRecurring: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -319,20 +624,19 @@ const ExpenseTrackerPage = () => {
     }, 100);
   };
 
-  // Filter data based on current filters - use real expenses when authenticated, fallback to mock
-  const currentData = entryType === 'expense' 
-    ? (isAuthenticated && expenses.length > 0 ? expenses : emptyExpenseData)
-    : (emptyIncomeData); // For now, income still uses mock data
+  // Filter data based on current filters and view type
+  const currentData = isAuthenticated && expenses.length > 0 
+    ? expenses.filter(expense => expense.type === viewType)
+    : (viewType === 'expense' ? emptyExpenseData : emptyIncomeData);
   
-  console.log('ExpenseTrackerPage - currentData:', currentData, 'entryType:', entryType, 'isAuthenticated:', isAuthenticated);
-  console.log('ExpenseTrackerPage - expenses from API:', expenses);
   
   // Ensure currentData is always an array
   const dataArray = Array.isArray(currentData) ? currentData : (currentData ? Object.values(currentData) : []);
-  console.log('ExpenseTrackerPage - dataArray:', dataArray);
   
   const filteredData = dataArray.filter(entry => {
     if (!entry) return false;
+    // Filter by view type (expense/income) based on the toggle
+    if (entry.type !== viewType) return false;
     if (filters.category !== 'all' && entry.category !== filters.category) return false;
     if (filters.dateFrom && new Date(entry.date) < new Date(filters.dateFrom)) return false;
     if (filters.dateTo && new Date(entry.date) > new Date(filters.dateTo)) return false;
@@ -343,14 +647,23 @@ const ExpenseTrackerPage = () => {
 
   const hasActiveFilters = filters.category !== 'all' || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax;
 
-  // Handle form submission for adding new expenses
+  // Handle form submission for adding new expenses/income
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name || !formData.amount || !formData.category) {
-      console.log('Please fill in all required fields');
       return;
     }
+
+    if (parseFloat(formData.amount) < 0.01) {
+      return;
+    }
+
+    // Handle income vs expense amount processing
+    const amount = entryType === 'income' 
+      ? Math.abs(parseFloat(formData.amount)) // Keep income positive
+      : -Math.abs(parseFloat(formData.amount)); // Make expense negative
+    const type = entryType as 'expense' | 'income';
 
     if (!isAuthenticated) {
       // Demo mode: add to local state so it appears in list
@@ -358,9 +671,10 @@ const ExpenseTrackerPage = () => {
         id: `mock-${Date.now()}`,
         userId: 'mock',
         name: formData.name,
-        amount: parseFloat(formData.amount),
+        amount: amount,
         category: formData.category,
         date: formData.date,
+        type: type,
         isRecurring: formData.isRecurring,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -392,13 +706,13 @@ const ExpenseTrackerPage = () => {
     }
 
     try {
-      console.log('Saving expense:', formData);
       
       await apiClient.createExpense({
         name: formData.name,
-        amount: parseFloat(formData.amount),
+        amount: amount, // Use the processed amount
         category: formData.category,
         date: formData.date,
+        type: type,
         isRecurring: formData.isRecurring,
         notes: undefined
       });
@@ -429,9 +743,8 @@ const ExpenseTrackerPage = () => {
       // Reload expenses
       await loadExpenses();
       
-      console.log('Expense saved successfully');
     } catch (error) {
-      console.error('Error saving expense:', error);
+      console.error('Error saving entry:', error);
     }
   };
 
@@ -473,9 +786,6 @@ const ExpenseTrackerPage = () => {
     }
   };
 
-  // Chart data
-  const chartData = emptyTrendData;
-  const expenseBreakdown = emptyExpenseBreakdown;
 
   return (
     <div className="min-h-screen bg-white bg-gradient-to-b from-[#f5f6fa] to-[#e9eafc] p-6 lg:p-10">
@@ -543,7 +853,7 @@ const ExpenseTrackerPage = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
                   placeholder="0.00"
                   step="0.01"
-                  min="0"
+                  min="0.01"
                   required
                 />
               </div>
@@ -671,6 +981,8 @@ const ExpenseTrackerPage = () => {
                         <Input
                           type="number"
                           placeholder="0.00"
+                          min="0.01"
+                          step="0.01"
                           value={expense.amount}
                           onChange={(e) => setRecurringExpenses(prev => 
                             prev.map(exp => exp.id === expense.id ? { ...exp, amount: e.target.value } : exp)
@@ -681,7 +993,7 @@ const ExpenseTrackerPage = () => {
                           type="button"
                           size="sm"
                           onClick={() => handleRecurringExpenseSubmit(expense.id, expense.amount, expense.name, expense.category, expense.date)}
-                          disabled={!expense.amount || parseFloat(expense.amount) <= 0 || !expense.name.trim()}
+                          disabled={!expense.amount || parseFloat(expense.amount) < 0.01 || !expense.name.trim()}
                           className="rounded-full px-3 py-1 text-xs font-semibold shadow-md bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:scale-105 transition-all duration-200"
                         >
                           Add
@@ -696,7 +1008,32 @@ const ExpenseTrackerPage = () => {
 
           {/* Monthly Summary - Restructured Layout */}
           <Card className={`${LAYOUT.standardCard} lg:col-span-2`}>
-            <h3 className={TYPOGRAPHY.sectionHeader}>Monthly Summary</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={TYPOGRAPHY.sectionHeader}>Monthly Summary</h3>
+              
+              {/* Month Navigation */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleMonthChange('prev')}
+                  className="h-8 w-8 p-0"
+                >
+                  ←
+                </Button>
+                <span className="text-sm font-medium min-w-[120px] text-center">
+                  {selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleMonthChange('next')}
+                  className="h-8 w-8 p-0"
+                >
+                  →
+                </Button>
+              </div>
+            </div>
             
             {/* Progress Bars at the Top */}
             <div className="mb-6 space-y-4">
@@ -705,8 +1042,8 @@ const ExpenseTrackerPage = () => {
                 <div className="space-y-1">
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">{incomeData.name}</span>
-                    <span className={`font-semibold ${incomeData.actual > incomeData.planned ? 'text-green-600' : 'text-red-600'}`}>
-                      {incomeData.actual > incomeData.planned ? '✓' : '✗'} ₹{Math.abs(incomeData.actual - incomeData.planned).toLocaleString()}
+                    <span className={`font-semibold ${incomeData.actual >= incomeData.planned ? 'text-green-600' : 'text-red-600'}`}>
+                      {incomeData.actual >= incomeData.planned ? '✓' : '✗'} ₹{incomeData.actual.toLocaleString()}/{incomeData.planned.toLocaleString()}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
@@ -723,8 +1060,8 @@ const ExpenseTrackerPage = () => {
                 <div className="space-y-1">
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">{investmentsData.name}</span>
-                    <span className={`font-semibold ${investmentsData.actual > investmentsData.planned ? 'text-green-600' : 'text-red-600'}`}>
-                      {investmentsData.actual > investmentsData.planned ? '✓' : '✗'} ₹{Math.abs(investmentsData.actual - investmentsData.planned).toLocaleString()}
+                    <span className={`font-semibold ${investmentsData.actual >= investmentsData.planned ? 'text-green-600' : 'text-red-600'}`}>
+                      {investmentsData.actual >= investmentsData.planned ? '✓' : '✗'} ₹{investmentsData.actual.toLocaleString()}/{investmentsData.planned.toLocaleString()}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
@@ -741,8 +1078,8 @@ const ExpenseTrackerPage = () => {
                 <div className="space-y-1">
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">{expensesData.name}</span>
-                    <span className={`font-semibold ${expensesData.actual < expensesData.planned ? 'text-green-600' : 'text-red-600'}`}>
-                      {expensesData.actual < expensesData.planned ? '✓' : '✗'} ₹{Math.abs(expensesData.actual - expensesData.planned).toLocaleString()}
+                    <span className={`font-semibold ${expensesData.actual <= expensesData.planned ? 'text-green-600' : 'text-red-600'}`}>
+                      {expensesData.actual <= expensesData.planned ? '✓' : '✗'} ₹{expensesData.actual.toLocaleString()}/{expensesData.planned.toLocaleString()}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
@@ -768,7 +1105,7 @@ const ExpenseTrackerPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {monthlyData.mainCategories.map((category) => {
+                  {monthlyData?.mainCategories?.map((category) => {
                     const isIncome = category.type === 'income';
                     const IconComponent = category.icon;
                     
@@ -786,7 +1123,17 @@ const ExpenseTrackerPage = () => {
                             <span className="font-medium text-sm">{category.name}</span>
                           </div>
                         </td>
-                        <td className="text-center py-3 px-2 text-sm">₹{category.planned.toLocaleString()}</td>
+                        <td className="text-center py-3 px-2 text-sm">
+                          <Input
+                            type="number"
+                            value={category.planned || ''}
+                            onChange={(e) => handlePlannedValueChange(category.name, e.target.value)}
+                            className="w-20 h-8 text-center text-xs"
+                            placeholder="0"
+                            min="0"
+                            step="1"
+                          />
+                        </td>
                         <td className="text-center py-3 px-2 text-sm">₹{category.actual.toLocaleString()}</td>
                         <td className="text-center py-3 px-2 text-sm text-gray-600">₹{category.threeMonthAvg.toLocaleString()}</td>
                         <td className="text-center py-3 px-2 text-sm text-gray-600">₹{category.oneYearAvg.toLocaleString()}</td>
@@ -801,7 +1148,7 @@ const ExpenseTrackerPage = () => {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <tbody className="divide-y divide-gray-100">
-                  {monthlyData.expenseCategories.map((category, index) => {
+                  {monthlyData?.expenseCategories?.map((category, index) => {
                     const IconComponent = category.icon;
                     
                     return (
@@ -822,7 +1169,17 @@ const ExpenseTrackerPage = () => {
                             </span>
                           </div>
                         </td>
-                        <td className="text-center py-3 px-2 text-sm">₹{category.planned.toLocaleString()}</td>
+                        <td className="text-center py-3 px-2 text-sm">
+                          <Input
+                            type="number"
+                            value={category.planned || ''}
+                            onChange={(e) => handlePlannedValueChange(category.name, e.target.value)}
+                            className="w-20 h-8 text-center text-xs"
+                            placeholder="0"
+                            min="0"
+                            step="1"
+                          />
+                        </td>
                         <td className="text-center py-3 px-2 text-sm">₹{category.actual.toLocaleString()}</td>
                         <td className="text-center py-3 px-2 text-sm text-gray-600">₹{category.threeMonthAvg.toLocaleString()}</td>
                         <td className="text-center py-3 px-2 text-sm text-gray-600">₹{category.oneYearAvg.toLocaleString()}</td>
@@ -839,10 +1196,10 @@ const ExpenseTrackerPage = () => {
         <div ref={recentTransactionsRef}>
           <Card className={LAYOUT.standardCard}>
             <div className="flex items-center justify-between mb-6">
-              <h3 className={TYPOGRAPHY.sectionHeader}>Recent {entryType === 'expense' ? 'Expenses' : 'Income'}</h3>
+              <h3 className={TYPOGRAPHY.sectionHeader}>Recent {viewType === 'expense' ? 'Expenses' : 'Income'}</h3>
               <ToggleTabs
-                value={entryType}
-                onValueChange={(value) => handleEntryTypeChange(value)}
+                value={viewType}
+                onValueChange={(value) => handleViewTypeChange(value)}
                 items={[
                   { value: 'expense', label: 'Expenses' },
                   { value: 'income', label: 'Income' }
@@ -972,10 +1329,23 @@ const ExpenseTrackerPage = () => {
                         </div>
                       </div>
                     </div>
-                    <div className={`text-lg font-bold ${
-                      entryType === 'expense' ? 'text-red-600' : 'text-green-600'
-                    }`}>
-                      {entryType === 'expense' ? '-' : '+'}₹{entry.amount.toLocaleString()}
+                    <div className="flex items-center gap-3">
+                      <div className={`text-lg font-bold ${
+                        entry.type === 'expense' ? 'text-red-600' : 'text-green-600'
+                      }`}>
+                        {entry.type === 'expense' ? '' : '+'}₹{Math.abs(entry.amount).toLocaleString()}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteExpense(entry.id);
+                        }}
+                        className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))

@@ -107,6 +107,7 @@ export interface Expense {
   amount: number;
   category: string;
   date: string;
+  type: 'expense' | 'income';
   isRecurring: boolean;
   notes?: string;
   createdAt: string;
@@ -376,16 +377,24 @@ class ApiClient {
   }
 
   // Expense Methods
-  async getExpenses(params?: { startDate?: string; endDate?: string }): Promise<Expense[]> {
+  async getExpenses(params?: { startDate?: string; endDate?: string; type?: 'expense' | 'income' }): Promise<Expense[]> {
     const queryParams = new URLSearchParams();
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.type) queryParams.append('type', params.type);
     
     const endpoint = `/expenses${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     const response = await this.request<{ items: Expense[]; total: number; page: number; limit: number; hasMore: boolean }>(endpoint);
     
     // Extract the items array from the paginated response
-    return response.data?.items || [];
+    let items = response.data?.items || [];
+    
+    // Client-side filtering as fallback if backend doesn't support type filtering
+    if (params?.type && items.length > 0) {
+      items = items.filter(item => item.type === params.type);
+    }
+    
+    return items;
   }
 
   async createExpense(expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<Expense> {
@@ -418,6 +427,15 @@ class ApiClient {
     const endpoint = `/expenses/analytics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     const response = await this.request(endpoint);
     return response.data!;
+  }
+
+  // Convenience methods for getting expenses and income separately
+  async getExpensesOnly(params?: { startDate?: string; endDate?: string }): Promise<Expense[]> {
+    return this.getExpenses({ ...params, type: 'expense' });
+  }
+
+  async getIncomeOnly(params?: { startDate?: string; endDate?: string }): Promise<Expense[]> {
+    return this.getExpenses({ ...params, type: 'income' });
   }
 
   // Investment Methods
