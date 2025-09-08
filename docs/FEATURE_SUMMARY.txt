@@ -1,0 +1,83 @@
+Pulseboard - Life Tracker (V1) - Product Feature Summary
+
+Overview
+Pulseboard helps you plan, execute, and measure personal tasks across core life categories (Health, Strength, Mind, Work, Spirit). It provides a calendar, progress analytics, category insights, and CSV-powered bulk imports.
+
+Navigation
+- Dashboard/Progress: Lifetime stats overview, trends, categories breakdown, goals highlights.
+- Calendar: Create, edit, complete, and view tasks by date; filter by category/status.
+- Expenses & Investments: Placeholder sections for future finance tracking.
+- Profile: Account actions including CSV bulk task import.
+
+Core Concepts
+- Tasks: name, description, duration, optional date, categories, points per category, status (pending/in-progress/completed).
+- Points: Positive when completed on/before due date. Negative equivalents applied for overdue pending/in-progress tasks on the due date (impact lifetime totals).
+- Categories: Health, Strength, Mind, Work, Spirit.
+- Users: Identified via Cognito (userId from JWT sub).
+
+Key Features
+1) Calendar & Task Management
+- Add/Edit/Delete a task.
+- Set dated or undated tasks; filter by date, status, or category.
+- Sorted ascending by date (undated tasks listed last).
+- Pagination applied after sorting for consistent UI.
+
+2) Bulk CSV Import (Profile)
+- Upload CSV via UI to import historical tasks.
+- Parses quoted fields, converts DD-MMM-YYYY to YYYY-MM-DD, splits category lists, and maps points like '1,2' -> {health:1, strength:2}.
+- CORS-safe via API Gateway configuration (allowOrigins:* for development; credentials false).
+- Admin password gate supported (configurable).
+
+3) Lifetime Points
+- Backend /points?period=lifetime returns:
+  - categories: actual earned points (incl. negative overdue penalties).
+  - total: sum of category actuals.
+  - totalPossible: achievable points per category from all tasks up to today regardless of completion.
+  - totalPossibleTotal: sum of achievable points.
+- UI lifetime bars:
+  - Bar max = totalPossible per category; value = actual (floored at 0 for display).
+  - Label shows percentage (rounded).
+
+4) Trends (Daily Cumulative Line Chart)
+- Endpoint /points/daily-cumulative?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD.
+- Series starts from lifetime totals as of the day before startDate, ensuring continuity (does not reset to 0).
+- Per-day points include completed positives and overdue negatives.
+
+5) Categories Pie (Range Totals)
+- Uses /points with date_from & date_to; distribution taken from totals within range.
+- Displays non-negative values for readability; percentages computed from displayed totals.
+
+6) Goals (MVP demo + real)
+- Demo goals visible without auth; real CRUD available when signed in.
+- Auto-sync of goal progress after points refresh.
+
+7) Authentication
+- Cognito-based; backend extracts userId from JWT sub claim.
+
+Data Model & Infra
+- DynamoDB single-table with PK=USER#{sub}, SK=TASK#{id}.
+- Query by PK with begins_with(SK,'TASK#'); app-side sort & paginate.
+- AWS Lambda + API Gateway with global CORS preflight allowing all origins (dev) to prevent CORS issues.
+
+Developer Notes
+- Frontend: React + TypeScript (Vite), Recharts, date-fns, shadcn/ui-like components.
+- Backend: Node TypeScript Lambdas; scripts for CSV direct upload, userId migration, task counts.
+- CORS: Consistent headers and API GW preflight across endpoints.
+
+Known Placeholders / Future Work
+- Expenses: Placeholder page and upcoming APIs (not implemented).
+- Investments: Placeholder portfolio view (limited functionality).
+- Achievements list includes demo data when not authenticated.
+- Advanced goals analytics, reminders/notifications not yet implemented.
+
+User Workflows
+- Import history: Profile -> Upload CSV -> confirm; data appears in Calendar and Progress after processing.
+- Review progress: Progress -> Lifetime bars (percent), Trends (date range), Categories (range).
+- Manage tasks: Calendar -> create/edit/complete; verify order and filters.
+
+Release Summary (V1)
+- CSV-driven data import with robust parsing.
+- Correct lifetime scaling using totalPossible; negative overdue handling.
+- Daily cumulative with lifetime baseline.
+- Asc-date sorting with app-side pagination in /tasks.
+- Global CORS stability for all endpoints.
