@@ -69,7 +69,8 @@ const ExpenseTrackerPage = () => {
   const loadExpenses = async () => {
     setLoading(true);
     try {
-      const apiExpenses = await apiClient.getExpenses();
+      // Fetch all pages to enable full-page filtering and accurate monthly summaries
+      const apiExpenses = await apiClient.getAllExpenses();
       setExpenses(apiExpenses);
     } catch (error) {
       setExpenses([]);

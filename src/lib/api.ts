@@ -137,6 +137,9 @@ export interface PointsSummary {
   date: string;
   categories: Record<string, number>;
   total: number;
+  // Add total possible points for progress bar calculations (only for lifetime period)
+  totalPossible?: Record<string, number>;
+  totalPossibleTotal?: number;
 }
 
 export interface PortfolioSummary {
@@ -377,11 +380,13 @@ class ApiClient {
   }
 
   // Expense Methods
-  async getExpenses(params?: { startDate?: string; endDate?: string; type?: 'expense' | 'income' }): Promise<Expense[]> {
+  async getExpenses(params?: { startDate?: string; endDate?: string; type?: 'expense' | 'income'; page?: number; limit?: number }): Promise<Expense[]> {
     const queryParams = new URLSearchParams();
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
     if (params?.type) queryParams.append('type', params.type);
+    if (params?.page) queryParams.append('page', String(params.page));
+    if (params?.limit) queryParams.append('limit', String(params.limit));
     
     const endpoint = `/expenses${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     const response = await this.request<{ items: Expense[]; total: number; page: number; limit: number; hasMore: boolean }>(endpoint);
@@ -395,6 +400,29 @@ class ApiClient {
     }
     
     return items;
+  }
+
+  async getAllExpenses(params?: { startDate?: string; endDate?: string; type?: 'expense' | 'income' }): Promise<Expense[]> {
+    const all: Expense[] = [];
+    let page = 1;
+    const limit = 100; // backend cap is 100
+    while (true) {
+      const items = await this.getExpenses({ ...params, page, limit });
+      all.push(...items);
+      if (items.length < limit) break; // no more pages
+      page += 1;
+      if (page > 100) break; // safety cap
+    }
+    return all;
+  }
+  
+  // Convenience methods for getting expenses and income separately
+  async getExpensesOnly(params?: { startDate?: string; endDate?: string }): Promise<Expense[]> {
+    return this.getAllExpenses({ ...params, type: 'expense' });
+  }
+
+  async getIncomeOnly(params?: { startDate?: string; endDate?: string }): Promise<Expense[]> {
+    return this.getAllExpenses({ ...params, type: 'income' });
   }
 
   async createExpense(expense: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<Expense> {
@@ -427,15 +455,6 @@ class ApiClient {
     const endpoint = `/expenses/analytics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     const response = await this.request(endpoint);
     return response.data!;
-  }
-
-  // Convenience methods for getting expenses and income separately
-  async getExpensesOnly(params?: { startDate?: string; endDate?: string }): Promise<Expense[]> {
-    return this.getExpenses({ ...params, type: 'expense' });
-  }
-
-  async getIncomeOnly(params?: { startDate?: string; endDate?: string }): Promise<Expense[]> {
-    return this.getExpenses({ ...params, type: 'income' });
   }
 
   // Investment Methods
@@ -584,6 +603,45 @@ class ApiClient {
       method: 'DELETE',
     });
     return response;
+  }
+
+  // Bulk Import Methods
+  async bulkImportTasks(csvData: string, adminPassword: string): Promise<{
+    success: number;
+    failed: number;
+    errors: string[];
+    summary: {
+      totalRows: number;
+      completedTasks: number;
+      pendingTasks: number;
+    };
+  }> {
+    const response = await this.request('/bulk/import-tasks', {
+      method: 'POST',
+      body: JSON.stringify({
+        csvData,
+        adminPassword
+      }),
+    });
+    return response.data!;
+  }
+
+  async bulkImportExpenses(csvData: string, adminPassword: string): Promise<{
+    success: number;
+    failed: number;
+    errors: string[];
+    summary: {
+      totalRows: number;
+    };
+  }> {
+    const response = await this.request('/bulk/import-expenses', {
+      method: 'POST',
+      body: JSON.stringify({
+        csvData,
+        adminPassword
+      }),
+    });
+    return response.data!;
   }
 }
 

@@ -290,6 +290,7 @@ const TaskCalendarPage = () => {
     setEditingTask(undefined);
   };
 
+
   const getFilteredTasks = () => {
     // Tasks are already filtered based on the current view in loadTasks
     return tasks;
@@ -362,24 +363,24 @@ const TaskCalendarPage = () => {
                   <h3 className={TYPOGRAPHY.cardTitle}>Task Management</h3>
                   <p className={TYPOGRAPHY.bodyText}>View and manage your daily tasks</p>
                 </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setSelectedDate(new Date(2025, 8, 1))}
-                    className="text-xs"
-                  >
-                    Go to Tasks
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setSelectedDate(new Date(2025, 8, 1))}
-                    className="text-xs"
-                  >
-                    Sep 1st
-                  </Button>
-                </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setSelectedDate(new Date(2025, 8, 1))}
+                      className="text-xs"
+                    >
+                      Go to Tasks
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setSelectedDate(new Date(2025, 8, 1))}
+                      className="text-xs"
+                    >
+                      Sep 1st
+                    </Button>
+                  </div>
               </div>
               
               <ToggleTabs

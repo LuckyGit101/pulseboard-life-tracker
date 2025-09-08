@@ -7,12 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { User, Mail, Calendar, Settings, Globe, Download, Shield, LogOut, ArrowRight, Bell, Moon, Trash } from 'lucide-react';
+import { User, Mail, Calendar, Settings, Globe, Download, Shield, LogOut, ArrowRight, Bell, Moon, Trash, Upload } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useCategories } from '@/contexts/CategoryContext';
+import CSVUploadModal from '@/components/tasks/CSVUploadModal';
 
 
 const ProfilePage = () => {
@@ -27,6 +28,8 @@ const ProfilePage = () => {
   const [dateTo, setDateTo] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteResult, setDeleteResult] = useState<string | null>(null);
+  const [showCSVUpload, setShowCSVUpload] = useState(false);
+  const [csvMode, setCsvMode] = useState<'tasks' | 'expenses'>('tasks');
   
   const [userInfo, setUserInfo] = useState({
     name: user?.name || '',
@@ -52,6 +55,12 @@ const ProfilePage = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleCSVUploadSuccess = () => {
+    // Close the modal after successful upload
+    setShowCSVUpload(false);
+    // You could add a toast notification here if needed
   };
 
   const getInitials = (name: string) => {
@@ -435,6 +444,40 @@ const ProfilePage = () => {
 
             <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
               <div>
+                <div className="font-medium text-foreground">Bulk Upload Tasks</div>
+                <div className="text-sm text-muted-foreground">
+                  Upload tasks from a CSV file to import your data
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={() => { setCsvMode('tasks'); setShowCSVUpload(true); }}
+                className="flex items-center gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                Upload CSV
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+              <div>
+                <div className="font-medium text-foreground">Bulk Upload Expenses</div>
+                <div className="text-sm text-muted-foreground">
+                  Upload expenses/income from a CSV file to import your data
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={() => { setCsvMode('expenses'); setShowCSVUpload(true); }}
+                className="flex items-center gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                Upload CSV
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+              <div>
                 <div className="font-medium text-foreground">Privacy Settings</div>
                 <div className="text-sm text-muted-foreground">
                   Manage your data and privacy preferences
@@ -531,6 +574,14 @@ const ProfilePage = () => {
             </div>
           </div>
         )}
+
+        {/* CSV Upload Modal */}
+        <CSVUploadModal
+          isOpen={showCSVUpload}
+          onClose={() => setShowCSVUpload(false)}
+          onSuccess={handleCSVUploadSuccess}
+          mode={csvMode}
+        />
       </div>
     </div>
   );
