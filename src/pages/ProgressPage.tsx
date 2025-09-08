@@ -243,13 +243,19 @@ const ProgressPage = () => {
       const lifetimeResp = await apiClient.getPointsSummary({ period: 'lifetime' });
       if (lifetimeResp) {
         setTotalPoints(lifetimeResp.total || 0);
-        // Also populate lifetime stats bars
-        const lifetimeStats = categories.map((cat, idx) => ({
-          name: cat,
-          current: Math.max(0, (lifetimeResp.categories?.[cat.toLowerCase()] ?? 0)),
-          max: 100,
-          color: ['health', 'strength', 'mind', 'work', 'spirit'][idx] as any
-        }));
+        // Also populate lifetime stats bars using total possible points
+        const lifetimeStats = categories.map((cat, idx) => {
+          const categoryKey = cat.toLowerCase();
+          const actualPoints = Math.max(0, (lifetimeResp.categories?.[categoryKey] ?? 0));
+          const totalPossible = lifetimeResp.totalPossible?.[categoryKey] || 100; // Fallback to 100 if not available
+          
+          return {
+            name: cat,
+            current: actualPoints,
+            max: totalPossible, // Use total possible points as maximum
+            color: ['health', 'strength', 'mind', 'work', 'spirit'][idx] as any
+          };
+        });
         setStatsData(lifetimeStats);
       } else {
         setTotalPoints(0);
@@ -277,11 +283,11 @@ const ProgressPage = () => {
         // Transform the series data for the line chart
         const transformedData = cumulativeResp.series.map(item => ({
           date: item.date,
-          Health: Math.max(0, item.categories.health || 0),
-          Strength: Math.max(0, item.categories.strength || 0),
-          Mind: Math.max(0, item.categories.mind || 0),
-          Work: Math.max(0, item.categories.work || 0),
-          Spirit: Math.max(0, item.categories.spirit || 0),
+          Health: item.categories.health || 0,
+          Strength: item.categories.strength || 0,
+          Mind: item.categories.mind || 0,
+          Work: item.categories.work || 0,
+          Spirit: item.categories.spirit || 0,
         }));
         setLineData(transformedData);
       } else {
@@ -470,7 +476,7 @@ const ProgressPage = () => {
                   <div className="flex-1">
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-base">{stat.name}</span>
-                      <span className="font-semibold text-violet-500 text-sm">{stat.current}/{stat.max} <span className="ml-1 text-xs">pts</span></span>
+                      <span className="font-semibold text-violet-500 text-sm">{Math.round((stat.current / stat.max) * 100)}%</span>
                     </div>
                     <div className="w-full h-3 bg-gray-200 rounded-full mt-1">
                       <div className={`h-3 rounded-full ${
