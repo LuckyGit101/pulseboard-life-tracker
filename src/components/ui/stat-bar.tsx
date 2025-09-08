@@ -24,7 +24,7 @@ const StatBar = ({ label, current, max, color }: StatBarProps) => {
       <div className="flex-1">
         <div className="flex justify-between items-center">
           <span className="font-medium text-base">{label}</span>
-          <span className="font-semibold text-violet-500 text-sm">{current}/{max} <span className="ml-1 text-xs">pts</span></span>
+          <span className="font-semibold text-violet-500 text-sm">{Math.round(percentage)}%</span>
         </div>
         <div className="w-full h-3 bg-gray-200 rounded-full mt-1">
           <div 
