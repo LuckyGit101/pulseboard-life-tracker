@@ -154,12 +154,20 @@ const ExpenseTrackerPage = () => {
             icon: Zap
           },
           { 
-            name: 'Shopping', 
+            name: 'Personal', 
             planned: 0, 
             actual: 0, 
             threeMonthAvg: 0, 
             oneYearAvg: 0,
             icon: User
+          },
+          { 
+            name: 'Debt', 
+            planned: 0, 
+            actual: 0, 
+            threeMonthAvg: 0, 
+            oneYearAvg: 0,
+            icon: DollarSign
           }
         ]
       };
@@ -337,12 +345,20 @@ const ExpenseTrackerPage = () => {
           icon: Zap
         },
         { 
-          name: 'Shopping', 
-          planned: plannedValues[monthKey]?.Shopping || 0, 
-          actual: currentCategoryTotals['Shopping'] || 0, 
-          threeMonthAvg: Math.round((threeMonthCategoryTotals['Shopping'] || 0) / Math.max(threeMonthCount, 1)), 
-          oneYearAvg: Math.round((oneYearCategoryTotals['Shopping'] || 0) / Math.max(oneYearCount, 1)),
+          name: 'Personal', 
+          planned: plannedValues[monthKey]?.Personal || 0, 
+          actual: currentCategoryTotals['Personal'] || 0, 
+          threeMonthAvg: Math.round((threeMonthCategoryTotals['Personal'] || 0) / Math.max(threeMonthCount, 1)), 
+          oneYearAvg: Math.round((oneYearCategoryTotals['Personal'] || 0) / Math.max(oneYearCount, 1)),
           icon: User
+        },
+        { 
+          name: 'Debt', 
+          planned: plannedValues[monthKey]?.Debt || 0, 
+          actual: currentCategoryTotals['Debt'] || 0, 
+          threeMonthAvg: Math.round((threeMonthCategoryTotals['Debt'] || 0) / Math.max(threeMonthCount, 1)), 
+          oneYearAvg: Math.round((oneYearCategoryTotals['Debt'] || 0) / Math.max(oneYearCount, 1)),
+          icon: DollarSign
         }
       ]
     };

@@ -35,8 +35,8 @@ const seedDefaults = (): Category[] => {
 
   // Tasks: 5
   const task = ['Health', 'Strength', 'Mind', 'Work', 'Spirit'].map((n, i) => mk('task', n, i));
-  // Expenses: 6
-  const expense = ['Food', 'Housing', 'Transport', 'Health', 'Utilities', 'Shopping'].map((n, i) => mk('expense', n, i));
+  // Expenses: 7 (updated set)
+  const expense = ['Housing', 'Utilities', 'Food', 'Health', 'Personal', 'Transport', 'Debt'].map((n, i) => mk('expense', n, i));
   // Investments: some sensible defaults
   const investment = ['Stocks', 'Mutual Funds', 'Gold', 'Crypto'].map((n, i) => mk('investment', n, i));
 
@@ -50,7 +50,25 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        setCategories(JSON.parse(raw));
+        const loaded: Category[] = JSON.parse(raw);
+        // Migration: update expense categories from old set (with 'Shopping') to new set
+        const currentExpense = loaded.filter(c => c.type === 'expense').map(c => c.name);
+        const needsMigration = currentExpense.includes('Shopping') || currentExpense.length < 7 || !currentExpense.includes('Personal') || !currentExpense.includes('Debt');
+        if (needsMigration) {
+          const preservedNonExpense = loaded.filter(c => c.type !== 'expense');
+          const migratedExpense = ['Housing', 'Utilities', 'Food', 'Health', 'Personal', 'Transport', 'Debt'].map((n, i) => ({
+            id: `expense-${Date.now()}-${i}`,
+            type: 'expense' as const,
+            name: n,
+            isActive: true,
+            order: i,
+          }));
+          const updated = [...preservedNonExpense, ...migratedExpense];
+          setCategories(updated);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        } else {
+          setCategories(loaded);
+        }
       } else {
         const seeded = seedDefaults();
         setCategories(seeded);
@@ -68,7 +86,7 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch {}
   }, [categories]);
 
-  const limits = useMemo(() => ({ task: 5, expense: 6, investment: null as number | null }), []);
+  const limits = useMemo(() => ({ task: 5, expense: 7, investment: null as number | null }), []);
 
   const getByType = (type: CategoryType) => categories.filter(c => c.type === type && c.isActive);
 
@@ -102,6 +120,8 @@ export const useCategories = (): CategoryContextValue => {
   if (!ctx) throw new Error('useCategories must be used within CategoryProvider');
   return ctx;
 };
+
+
 
 
 
