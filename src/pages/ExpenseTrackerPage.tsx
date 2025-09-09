@@ -194,13 +194,15 @@ const ExpenseTrackerPage = () => {
 
     // Helper function to calculate totals for a month
     const calculateMonthTotals = (monthExpenses: any[]) => {
+      // Income should be sum of positive amounts (or entries marked income)
       const income = monthExpenses
-        .filter(expense => expense.type === 'income')
-        .reduce((sum, expense) => sum + expense.amount, 0);
-      
-      const expenseTotal = Math.abs(monthExpenses
-        .filter(expense => expense.type === 'expense')
-        .reduce((sum, expense) => sum + expense.amount, 0));
+        .filter(entry => entry.type === 'income')
+        .reduce((sum, entry) => sum + Math.abs(entry.amount), 0);
+
+      // Expenses should be absolute sum of negative amounts (or entries marked expense)
+      const expenseTotal = monthExpenses
+        .filter(entry => entry.type === 'expense')
+        .reduce((sum, entry) => sum + Math.abs(entry.amount), 0);
 
       return { income, expenseTotal };
     };
