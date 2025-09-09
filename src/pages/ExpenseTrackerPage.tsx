@@ -184,8 +184,11 @@ const ExpenseTrackerPage = () => {
     // Helper function to get expenses for a specific month
     const getExpensesForMonth = (year: number, month: number) => {
       return expenses.filter(expense => {
-        const expenseDate = new Date(expense.date);
-        return expenseDate.getMonth() === month && expenseDate.getFullYear() === year;
+        // Normalize to YYYY-MM-DD and compare components to avoid TZ issues
+        const [y, m, d] = expense.date.split('T')[0].split('-');
+        const eYear = parseInt(y, 10);
+        const eMonth = parseInt(m, 10) - 1; // zero-based
+        return eYear === year && eMonth === month;
       });
     };
 

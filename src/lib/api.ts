@@ -626,7 +626,7 @@ class ApiClient {
     return response.data!;
   }
 
-  async bulkImportExpenses(csvData: string, adminPassword: string, defaultType?: 'expense' | 'income'): Promise<{
+  async bulkImportExpenses(csvData: string, adminPassword: string): Promise<{
     success: number;
     failed: number;
     errors: string[];
@@ -638,8 +638,7 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({
         csvData,
-        adminPassword,
-        ...(defaultType ? { defaultType } : {})
+        adminPassword
       }),
     });
     return response.data!;

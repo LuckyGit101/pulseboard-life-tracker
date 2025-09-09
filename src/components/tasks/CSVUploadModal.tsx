@@ -20,7 +20,6 @@ const CSVUploadModal: React.FC<CSVUploadModalProps> = ({ isOpen, onClose, onSucc
   const [adminPassword, setAdminPassword] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
-  const [defaultType, setDefaultType] = useState<'expense' | 'income'>('expense');
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,7 +54,7 @@ const CSVUploadModal: React.FC<CSVUploadModalProps> = ({ isOpen, onClose, onSucc
       
       // Upload to backend
       const importResult = mode === 'expenses'
-        ? await apiClient.bulkImportExpenses(fileContent, adminPassword, defaultType)
+        ? await apiClient.bulkImportExpenses(fileContent, adminPassword)
         : await apiClient.bulkImportTasks(fileContent, adminPassword);
       
       setResult(importResult);
@@ -147,34 +146,10 @@ const CSVUploadModal: React.FC<CSVUploadModalProps> = ({ isOpen, onClose, onSucc
             />
           </div>
 
-          {/* Expense/Income default toggle for expenses mode */}
+          {/* Note about required type column for expenses uploads */}
           {mode === 'expenses' && (
-            <div className="space-y-2">
-              <Label>Default Type (applied if CSV lacks a 'type' column)</Label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="default-type"
-                    value="expense"
-                    checked={defaultType === 'expense'}
-                    onChange={() => setDefaultType('expense')}
-                    disabled={isUploading}
-                  />
-                  Expense
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    name="default-type"
-                    value="income"
-                    checked={defaultType === 'income'}
-                    onChange={() => setDefaultType('income')}
-                    disabled={isUploading}
-                  />
-                  Income
-                </label>
-              </div>
+            <div className="text-xs text-muted-foreground">
+              Add a 'type' column in your CSV with values 'income' or 'expense' per row.
             </div>
           )}
 
