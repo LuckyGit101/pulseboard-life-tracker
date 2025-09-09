@@ -28,6 +28,7 @@ const INCOME_CATEGORIES = {
 };
 
 const ExpenseTrackerPage = () => {
+  const PLANNED_STORAGE_KEY = 'planned_expenses_by_month_v1';
   const { isAuthenticated } = useAuth();
   const { getByType } = useCategories();
   const expenseCategories = getByType('expense');
@@ -61,6 +62,30 @@ const ExpenseTrackerPage = () => {
       loadMockExpenses();
     }
   }, [isAuthenticated]);
+
+  // Load planned values from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PLANNED_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          setPlannedValues(parsed);
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
+
+  // Persist planned values whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(PLANNED_STORAGE_KEY, JSON.stringify(plannedValues));
+    } catch {
+      // ignore storage errors
+    }
+  }, [plannedValues]);
 
   const loadMockExpenses = () => {
     setExpenses([]);
@@ -447,7 +472,8 @@ const ExpenseTrackerPage = () => {
   // Handle planned value updates
   const handlePlannedValueChange = (category: string, value: string) => {
     const monthKey = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}`;
-    const numValue = parseFloat(value) || 0;
+    const num = parseFloat(value);
+    const numValue = isNaN(num) ? 0 : num;
     
     setPlannedValues(prev => ({
       ...prev,
@@ -1148,7 +1174,7 @@ const ExpenseTrackerPage = () => {
                         <td className="text-center py-3 px-2 text-sm">
                           <Input
                             type="number"
-                            value={category.planned || ''}
+                            value={category.planned ?? 0}
                             onChange={(e) => handlePlannedValueChange(category.name, e.target.value)}
                             className="w-20 h-8 text-center text-xs"
                             placeholder="0"
@@ -1194,7 +1220,7 @@ const ExpenseTrackerPage = () => {
                         <td className="text-center py-3 px-2 text-sm">
                           <Input
                             type="number"
-                            value={category.planned || ''}
+                            value={category.planned ?? 0}
                             onChange={(e) => handlePlannedValueChange(category.name, e.target.value)}
                             className="w-20 h-8 text-center text-xs"
                             placeholder="0"
