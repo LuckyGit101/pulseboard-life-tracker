@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import ToggleTabs from '@/components/ui/toggle-tabs';
-import { DollarSign, TrendingDown, TrendingUp, Plus, Calendar, Home, Car, Heart, Zap, User, Utensils, PiggyBank, Clock, Trash2 } from 'lucide-react';
+import { DollarSign, TrendingDown, TrendingUp, Calendar, Home, Car, Heart, Zap, User, Utensils, PiggyBank, Clock, Trash2 } from 'lucide-react';
 import { TYPOGRAPHY, LAYOUT } from '@/lib/designSystem';
 import { apiClient, Expense } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -406,7 +406,7 @@ const ExpenseTrackerPage = () => {
     {
       id: '2',
       name: 'CC',
-      category: 'Shopping',
+      category: 'Personal',
       amount: '',
       date: new Date().toISOString().split('T')[0]
     },
