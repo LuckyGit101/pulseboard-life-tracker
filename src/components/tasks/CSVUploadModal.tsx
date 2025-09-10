@@ -17,7 +17,6 @@ interface CSVUploadModalProps {
 
 const CSVUploadModal: React.FC<CSVUploadModalProps> = ({ isOpen, onClose, onSuccess, mode = 'tasks' }) => {
   const [file, setFile] = useState<File | null>(null);
-  const [adminPassword, setAdminPassword] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const { toast } = useToast();
@@ -37,10 +36,10 @@ const CSVUploadModal: React.FC<CSVUploadModalProps> = ({ isOpen, onClose, onSucc
   };
 
   const handleUpload = async () => {
-    if (!file || !adminPassword) {
+    if (!file) {
       toast({
         title: "Missing information",
-        description: "Please select a CSV file and enter the admin password.",
+        description: "Please select a CSV file.",
         variant: "destructive",
       });
       return;
@@ -51,20 +50,96 @@ const CSVUploadModal: React.FC<CSVUploadModalProps> = ({ isOpen, onClose, onSucc
     try {
       // Read file content
       const fileContent = await file.text();
-      
-      // Upload to backend
-      const importResult = mode === 'expenses'
-        ? await apiClient.bulkImportExpenses(fileContent, adminPassword)
-        : await apiClient.bulkImportTasks(fileContent, adminPassword);
+
+      // Robust CSV parsing (supports quoted commas and CRLF)
+      const parseCsvLine = (line: string): string[] => {
+        const result: string[] = []; let current = ''; let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (inQuotes) {
+            if (ch === '"') {
+              if (i + 1 < line.length && line[i + 1] === '"') { current += '"'; i++; }
+              else { inQuotes = false; }
+            } else { current += ch; }
+          } else {
+            if (ch === '"') inQuotes = true; else if (ch === ',') { result.push(current); current = ''; } else current += ch;
+          }
+        }
+        result.push(current);
+        return result;
+      };
+      const lines = fileContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim().length > 0);
+      const headers = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+      const rows: any[] = [];
+      const normalizeDate = (s?: string) => {
+        if (!s) return undefined as any;
+        let t = String(s).replace(/\u00A0/g, ' ').trim();
+        const mmm: Record<string,string> = { jan:'01',january:'01', feb:'02',february:'02', mar:'03',march:'03', apr:'04',april:'04', may:'05', jun:'06',june:'06', jul:'07',july:'07', aug:'08',august:'08', sep:'09',sept:'09',september:'09', oct:'10',october:'10', nov:'11',november:'11', dec:'12',december:'12' };
+        const dm = t.match(/^(\d{1,2})-([A-Za-z]{3,9})-(\d{4})$/);
+        if (dm) {
+          const dd = String(Number(dm[1])).padStart(2,'0');
+          const mm = mmm[dm[2].toLowerCase()];
+          const yyyy = dm[3];
+          if (mm) return `${yyyy}-${mm}-${dd}`;
+        }
+        const sm = t.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if (sm) {
+          const dd = String(Number(sm[1])).padStart(2,'0');
+          const mm = String(Number(sm[2])).padStart(2,'0');
+          const yyyy = sm[3];
+          return `${yyyy}-${mm}-${dd}`;
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+        const dt = new Date(t);
+        if (!isNaN(dt.getTime())) {
+          const yyyy = dt.getUTCFullYear();
+          const mm = String(dt.getUTCMonth() + 1).padStart(2,'0');
+          const dd = String(dt.getUTCDate()).padStart(2,'0');
+          return `${yyyy}-${mm}-${dd}`;
+        }
+        return t;
+      };
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCsvLine(lines[i]);
+        if (cols.length === 1 && cols[0].trim() === '') continue;
+        const raw: any = {};
+        headers.forEach((h, idx) => { raw[h] = (cols[idx] ?? '').trim(); });
+        const cleaned: any = {
+          name: (raw.name ?? '').trim(),
+          categories: (raw.categories ?? '').trim(),
+          points: (raw.points ?? '').trim(),
+          status: String(raw.status ?? 'pending').toLowerCase(),
+          date: normalizeDate(raw.date),
+          description: (raw.description ?? '').trim(),
+          duration: raw.duration !== undefined && String(raw.duration).trim() !== '' ? Number(String(raw.duration).trim()) : undefined,
+        };
+        rows.push(cleaned);
+      }
+
+      // Send in safe chunks to avoid payload limits
+      const CHUNK_SIZE = 300;
+      let totalImported = 0; let totalDuplicates = 0; let totalFailed = 0; const allErrors: string[] = [];
+      for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+        const chunk = rows.slice(i, i + CHUNK_SIZE);
+        const res = await apiClient.importTasksBatch(chunk, false);
+        totalImported += res.imported || 0;
+        totalDuplicates += res.duplicates || 0;
+        totalFailed += res.failed || 0;
+        if (res.errors?.length) allErrors.push(...res.errors);
+      }
+      const importResult = {
+        success: totalImported,
+        failed: totalFailed,
+        errors: allErrors,
+        summary: { totalRows: rows.length, completedTasks: 0, pendingTasks: 0 }
+      };
       
       setResult(importResult);
       
       if (importResult.success > 0) {
         toast({
           title: "Upload successful!",
-          description: mode === 'expenses'
-            ? `Successfully imported ${importResult.success} expenses.`
-            : `Successfully imported ${importResult.success} tasks.`,
+          description: `Successfully imported ${importResult.success} tasks (${totalDuplicates} duplicates skipped).`,
         });
         onSuccess?.();
       } else {
@@ -89,7 +164,6 @@ const CSVUploadModal: React.FC<CSVUploadModalProps> = ({ isOpen, onClose, onSucc
 
   const handleClose = () => {
     setFile(null);
-    setAdminPassword('');
     setResult(null);
     onClose();
   };
@@ -133,18 +207,7 @@ const CSVUploadModal: React.FC<CSVUploadModalProps> = ({ isOpen, onClose, onSucc
             </div>
           </div>
 
-          {/* Admin Password */}
-          <div className="space-y-2">
-            <Label htmlFor="admin-password">Admin Password</Label>
-            <Input
-              id="admin-password"
-              type="password"
-              value={adminPassword}
-              onChange={(e) => setAdminPassword(e.target.value)}
-              placeholder="Enter admin password"
-              disabled={isUploading}
-            />
-          </div>
+          {/* Admin Password removed */}
 
           {/* Note about required type column for expenses uploads */}
           {mode === 'expenses' && (
@@ -220,7 +283,7 @@ const CSVUploadModal: React.FC<CSVUploadModalProps> = ({ isOpen, onClose, onSucc
             {!result && (
               <Button 
                 onClick={handleUpload} 
-                disabled={!file || !adminPassword || isUploading}
+                disabled={!file || isUploading}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 {isUploading ? 'Uploading...' : 'Upload CSV'}

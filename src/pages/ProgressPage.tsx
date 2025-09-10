@@ -261,7 +261,7 @@ const ProgressPage = () => {
         setTotalPoints(0);
       }
 
-      // Date range from UI selections
+      // Line chart date range from line controls
       let startDateAny: any = getStartDate(lineRange, lineCustom);
       let endDateAny: any = getEndDate(lineRange, lineCustom);
       const startDate = (startDateAny instanceof Date) ? startDateAny : new Date(startDateAny);
@@ -269,8 +269,16 @@ const ProgressPage = () => {
       const df = startDate.toISOString().split('T')[0];
       const dt = endDate.toISOString().split('T')[0];
 
-      // Pie chart totals for range
-      const rangeTotalsResp = await apiClient.getPointsSummary({ date_from: df, date_to: dt });
+      // Pie chart totals should be independently controlled by the pie controls
+      let pieStartAny: any = getStartDate(pieRange, pieCustom);
+      let pieEndAny: any = getEndDate(pieRange, pieCustom);
+      const pieStart = (pieStartAny instanceof Date) ? pieStartAny : new Date(pieStartAny);
+      const pieEnd = (pieEndAny instanceof Date) ? pieEndAny : new Date(pieEndAny);
+      const pdf = pieStart.toISOString().split('T')[0];
+      const pdt = pieEnd.toISOString().split('T')[0];
+
+      // Pie chart totals for its own range
+      const rangeTotalsResp = await apiClient.getPointsSummary({ date_from: pdf, date_to: pdt });
       if (rangeTotalsResp) {
         setPieTotals(rangeTotalsResp.categories || null);
       } else {

@@ -1,7 +1,7 @@
 // API Configuration for Pulseboard Backend
 export const config = {
   api: {
-    baseUrl: 'https://be98awqge7.execute-api.ap-southeast-2.amazonaws.com/dev',
+    baseUrl: (import.meta as any).env?.VITE_API_URL || 'http://127.0.0.1:8080',
   },
   auth: {
     tokenKey: 'pulseboard_token',

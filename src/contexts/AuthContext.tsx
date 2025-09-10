@@ -87,14 +87,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     
     try {
-      const response = await apiClient.signup(userData);
-      
-      // Store tokens
-      localStorage.setItem(config.auth.tokenKey, response.accessToken);
-      localStorage.setItem(config.auth.refreshTokenKey, response.refreshToken);
-      localStorage.setItem(config.auth.userKey, JSON.stringify(response.user));
-      
-      setUser(response.user);
+      await apiClient.signup(userData);
+      // No tokens are returned from signup; user should login next
       setIsLoading(false);
       return true;
     } catch (error) {

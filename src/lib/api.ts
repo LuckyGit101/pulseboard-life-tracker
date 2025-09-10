@@ -241,12 +241,11 @@ class ApiClient {
   }
 
   // Authentication Methods
-  async signup(userData: { email: string; name: string; password: string }): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>('/auth', {
+  async signup(userData: { email: string; name: string; password: string }): Promise<void> {
+    await this.request('/auth', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
-    return response.data!;
   }
 
   async signin(credentials: { email: string; password: string }): Promise<AuthResponse> {
@@ -606,40 +605,16 @@ class ApiClient {
   }
 
   // Bulk Import Methods
-  async bulkImportTasks(csvData: string, adminPassword: string): Promise<{
-    success: number;
+  async importTasksBatch(rows: Array<{ name: string; categories: string; points?: string; status?: string; date?: string; description?: string; duration?: number }>, dryRun: boolean = false): Promise<{
+    imported: number;
+    duplicates: number;
     failed: number;
     errors: string[];
-    summary: {
-      totalRows: number;
-      completedTasks: number;
-      pendingTasks: number;
-    };
+    summary: { total: number };
   }> {
-    const response = await this.request('/bulk/import-tasks', {
+    const response = await this.request('/tasks/import-batch', {
       method: 'POST',
-      body: JSON.stringify({
-        csvData,
-        adminPassword
-      }),
-    });
-    return response.data!;
-  }
-
-  async bulkImportExpenses(csvData: string, adminPassword: string): Promise<{
-    success: number;
-    failed: number;
-    errors: string[];
-    summary: {
-      totalRows: number;
-    };
-  }> {
-    const response = await this.request('/bulk/import-expenses', {
-      method: 'POST',
-      body: JSON.stringify({
-        csvData,
-        adminPassword
-      }),
+      body: JSON.stringify({ rows, dryRun })
     });
     return response.data!;
   }
