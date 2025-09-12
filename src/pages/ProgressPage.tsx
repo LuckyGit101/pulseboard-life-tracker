@@ -243,16 +243,19 @@ const ProgressPage = () => {
       const lifetimeResp = await apiClient.getPointsSummary({ period: 'lifetime' });
       if (lifetimeResp) {
         setTotalPoints(lifetimeResp.total || 0);
-        // Also populate lifetime stats bars using total possible points
+        // Use new achievable points fields if available, fallback to legacy fields
+        const achievableCategories = lifetimeResp.achievableCategories || lifetimeResp.totalPossible || {};
+        
+        // Calculate category percentages using achievable points as maximum
         const lifetimeStats = categories.map((cat, idx) => {
           const categoryKey = cat.toLowerCase();
           const actualPoints = Math.max(0, (lifetimeResp.categories?.[categoryKey] ?? 0));
-          const totalPossible = lifetimeResp.totalPossible?.[categoryKey] || 100; // Fallback to 100 if not available
+          const achievablePoints = Math.max(actualPoints, (achievableCategories?.[categoryKey] ?? 0));
           
           return {
             name: cat,
             current: actualPoints,
-            max: totalPossible, // Use total possible points as maximum
+            max: achievablePoints || 100, // Use achievable points as maximum for percentage calculation
             color: ['health', 'strength', 'mind', 'work', 'spirit'][idx] as any
           };
         });

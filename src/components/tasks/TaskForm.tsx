@@ -13,6 +13,8 @@ interface Task {
   title: string;
   description?: string;
   date?: string; // Made optional to support tasks without dates
+  isLongTerm?: boolean; // Long-term task flag
+  completedAt?: string | null; // Completion timestamp
   categories: string[];
   duration: number;
   repeatFrequency?: 'none' | 'daily' | 'weekly' | 'monthly';
@@ -35,6 +37,7 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
     title: '',
     description: '',
     hasDate: true, // New flag to control whether task has a date
+    isLongTerm: false, // Long-term task flag
     date: defaultDate || new Date().toISOString().split('T')[0],
     categories: [] as string[],
     duration: 30,
@@ -51,6 +54,7 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
         title: task.title,
         description: task.description || '',
         hasDate: !!task.date, // Set hasDate based on whether task has a date
+        isLongTerm: task.isLongTerm || false, // Set isLongTerm flag
         date: task.date || defaultDate || new Date().toISOString().split('T')[0],
         categories: task.categories,
         duration: task.duration,
@@ -70,10 +74,14 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
     // Ensure at least one category is selected (backend requirement)
     const finalCategories = formData.categories.length > 0 ? formData.categories : ['Work'];
 
+    // Determine if this should be a long-term task
+    const isLongTerm = !formData.hasDate || formData.isLongTerm;
+
     onSave({
       title: formData.title,
       description: formData.description,
       date: formData.hasDate ? formData.date : undefined, // Only include date if hasDate is true
+      isLongTerm: isLongTerm, // Include long-term flag
       categories: finalCategories,
       duration: formData.duration,
       repeatFrequency: formData.repeatFrequency,
@@ -179,6 +187,20 @@ const TaskForm = ({ task, defaultDate, onSave, onCancel }: TaskFormProps) => {
               />
             )}
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="isLongTerm"
+              checked={formData.isLongTerm}
+              onChange={(e) => setFormData(prev => ({ ...prev, isLongTerm: e.target.checked }))}
+              className="w-4 h-4 text-primary"
+            />
+            <Label htmlFor="isLongTerm">Long-term Task (No specific date)</Label>
+          </div>
+          <p className="text-xs text-gray-600">Check this for tasks without a specific deadline (e.g., "Learn Spanish", "Get in shape")</p>
         </div>
 
         <div className="space-y-3">

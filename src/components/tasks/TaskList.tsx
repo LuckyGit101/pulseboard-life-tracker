@@ -13,6 +13,8 @@ interface Task {
   title: string;
   description?: string;
   date?: string; // Made optional to support tasks without dates
+  isLongTerm?: boolean; // Long-term task flag
+  completedAt?: string | null; // Completion timestamp
   categories: string[];
   duration: number;
   completed: boolean;
@@ -210,6 +212,12 @@ const TaskList = ({
                               </Badge>
                             );
                           })}
+
+                          {task.isLongTerm && (
+                            <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                              Long-term
+                            </Badge>
+                          )}
 
                           {task.repeatFrequency && task.repeatFrequency !== 'none' && (
                             <Badge variant="outline" className="text-xs">

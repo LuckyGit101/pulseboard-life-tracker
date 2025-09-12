@@ -36,6 +36,8 @@ const transformApiTask = (task: Task | any): typeof emptyTasks[0] => {
     title: task.name,
     description: task.description || task.data?.description,
     date: task.date,
+    isLongTerm: task.isLongTerm || false,
+    completedAt: task.completedAt || null,
     categories: task.categories || task.data?.categories || [],
     duration: task.duration || task.data?.duration || 30,
     completed: task.status === 'completed',
@@ -87,15 +89,11 @@ const TaskCalendarPage = () => {
     try {
       let apiResponse;
       if (taskView === 'tasks') {
-        // For "Other Tasks" view, get all tasks without date filter
-        apiResponse = await apiClient.getTasks({
-          view: 'tasks'
-        });
+        // For "Other Tasks" view, load long-term tasks from backend
+        apiResponse = await apiClient.getTasks({ view: 'tasks' });
       } else if (taskView === 'weekly') {
-        // For weekly view, get all tasks and filter by week range
-        apiResponse = await apiClient.getTasks({
-          view: 'weekly'
-        });
+        // For weekly view, get all tasks client-side and filter by week window
+        apiResponse = await apiClient.getTasks();
       } else {
         // For daily view, get tasks for the specific selected date
         apiResponse = await apiClient.getTasks({
@@ -125,15 +123,17 @@ const TaskCalendarPage = () => {
         // Apply view-specific filtering
         let filteredTasks;
         if (taskView === 'tasks') {
-          // For "Other Tasks" view, only show tasks without dates
-          filteredTasks = sortedTasks.filter(task => !task.date);
+          // Show only long-term tasks
+          filteredTasks = sortedTasks.filter(task => task.isLongTerm === true);
         } else if (taskView === 'weekly') {
           // For weekly view, filter tasks within the week (Sunday to Saturday)
           const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
           const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 });
           
           filteredTasks = sortedTasks.filter(task => {
+            // Exclude long-term (sentinel-dated) from calendar views
             if (!task.date) return false;
+            if (task.isLongTerm) return false;
             const taskDate = new Date(task.date);
             return isWithinInterval(taskDate, { start: weekStart, end: weekEnd });
           });
@@ -241,6 +241,7 @@ const TaskCalendarPage = () => {
           name: taskData.title,
           description: taskData.description,
           date: taskData.date,
+          isLongTerm: taskData.isLongTerm,
           categories: taskData.categories,
           points: transformedPoints
         });
@@ -269,6 +270,7 @@ const TaskCalendarPage = () => {
            name: taskData.title,
            description: taskData.description,
            date: taskData.date,
+           isLongTerm: taskData.isLongTerm,
            categories: taskData.categories,
            points: transformedPoints,
            status: 'pending' as const

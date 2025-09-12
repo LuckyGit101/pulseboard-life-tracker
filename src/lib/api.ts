@@ -49,7 +49,9 @@ export interface Task {
   userId: string;
   name: string;
   description: string;
-  date: string;
+  date?: string; // Made optional to support long-term tasks
+  isLongTerm?: boolean; // Long-term task flag
+  completedAt?: string | null; // Actual completion timestamp
   categories: string[];
   points: Record<string, number>;
   status: 'completed' | 'pending';
@@ -137,7 +139,11 @@ export interface PointsSummary {
   date: string;
   categories: Record<string, number>;
   total: number;
-  // Add total possible points for progress bar calculations (only for lifetime period)
+  // Optional fields for lifetime view
+  achievableCategories?: Record<string, number>;
+  achievableTotal?: number;
+  progressPercentage?: number;
+  // Legacy fields for backward compatibility
   totalPossible?: Record<string, number>;
   totalPossibleTotal?: number;
 }
@@ -296,7 +302,7 @@ class ApiClient {
   }
 
   // Task Methods
-  async getTasks(params?: { date?: string; view?: 'daily' | 'weekly' | 'monthly' }): Promise<Task[]> {
+  async getTasks(params?: { date?: string; view?: 'daily' | 'weekly' | 'monthly' | 'tasks' }): Promise<Task[]> {
     const queryParams = new URLSearchParams();
     if (params?.date) queryParams.append('date', params.date);
     if (params?.view) queryParams.append('view', params.view);
