@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
+import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +37,7 @@ const ExpenseTrackerPage = () => {
   const [entryType, setEntryType] = useState<'expense' | 'income'>('expense');
   const [viewType, setViewType] = useState<'expense' | 'income'>('expense');
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [investments, setInvestments] = useState<Investment[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [plannedValues, setPlannedValues] = useState<Record<string, Record<string, number>>>({});
@@ -53,10 +56,17 @@ const ExpenseTrackerPage = () => {
     amountMax: ''
   });
 
+  // Balance widgets
+  const [balanceDate, setBalanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [startingDate, setStartingDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [startingBalance, setStartingBalance] = useState<string>('');
+  const [startingEntry, setStartingEntry] = useState<Expense | null>(null);
+
   // Load expenses based on authentication status
   useEffect(() => {
     if (isAuthenticated) {
       loadExpenses();
+      loadAllInvestments();
     } else {
       // Load mock data for demo mode
       loadMockExpenses();
@@ -97,10 +107,33 @@ const ExpenseTrackerPage = () => {
       // Fetch all pages to enable full-page filtering and accurate monthly summaries
       const apiExpenses = await apiClient.getAllExpenses();
       setExpenses(apiExpenses);
+
+      // Determine starting balance entry (identified by notes marker)
+      const start = apiExpenses.find(e => (e as any).notes === '__starting_balance__');
+      setStartingEntry(start || null);
+      if (start) {
+        setStartingBalance(String(Math.abs(start.amount || 0)));
+        setStartingDate(start.date);
+      } else {
+        // Default starting date = earliest expense date if available
+        if (apiExpenses.length > 0) {
+          const earliest = apiExpenses.reduce((min, e) => (e.date < min ? e.date : min), apiExpenses[0].date);
+          setStartingDate(earliest);
+        }
+      }
     } catch (error) {
       setExpenses([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAllInvestments = async () => {
+    try {
+      const list = await apiClient.getInvestments();
+      setInvestments(list || []);
+    } catch {
+      setInvestments([]);
     }
   };
 
@@ -672,6 +705,35 @@ const ExpenseTrackerPage = () => {
     }, 100);
   };
 
+  const handleSaveStartingBalance = async () => {
+    if (!isAuthenticated) return; // Only persist when logged in
+    const amountNum = Math.max(0, parseFloat(startingBalance || '0'));
+    if (!amountNum) return;
+    try {
+      if (startingEntry) {
+        // Update existing starting balance entry
+        const updated = await apiClient.updateExpense(startingEntry.id, { amount: amountNum, date: startingDate });
+        setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e));
+        setStartingEntry(updated);
+      } else {
+        // Create as a one-time income with identifying note
+        const created = await apiClient.createExpense({
+          name: 'Starting Balance',
+          amount: amountNum,
+          category: 'Starting Balance',
+          date: startingDate,
+          type: 'income' as any,
+          isRecurring: false,
+          notes: '__starting_balance__'
+        } as any);
+        setExpenses(prev => [created, ...prev]);
+        setStartingEntry(created);
+      }
+    } catch {
+      // no-op UI errors; leave state as-is
+    }
+  };
+
   // Filter data based on current filters and view type
   const currentData = isAuthenticated && expenses.length > 0 
     ? expenses.filter(expense => expense.type === viewType)
@@ -706,6 +768,52 @@ const ExpenseTrackerPage = () => {
       return mB - mA; // higher magnitude first
     })
     .slice(0, 30);
+
+  // Balance series (line chart)
+  const getBalanceSeries = () => {
+    const flows: Array<{ date: string; delta: number }> = [];
+    const addFlow = (date: string, delta: number) => {
+      if (!date) return;
+      flows.push({ date, delta });
+    };
+    const cutoff = new Date(balanceDate);
+    const startAmt = Math.max(0, parseFloat(startingBalance || '0'));
+    if (startingEntry || startAmt) {
+      addFlow(startingDate, startAmt);
+    }
+    // Expenses and incomes
+    expenses.forEach(e => {
+      const d = new Date(e.date);
+      if (isNaN(d.getTime()) || d > cutoff) return;
+      const amt = Math.abs(e.amount || 0);
+      if (e.type === 'income') addFlow(e.date, amt);
+      else addFlow(e.date, -amt);
+    });
+    // Investments as positive contributions
+    investments.forEach(inv => {
+      const d = new Date(inv.date);
+      if (isNaN(d.getTime()) || d > cutoff) return;
+      addFlow(inv.date, Math.abs((inv as any).amount || 0));
+    });
+    if (flows.length === 0) return [] as any[];
+    // Sort by date asc and build cumulative
+    flows.sort((a, b) => a.date.localeCompare(b.date));
+    let running = 0;
+    const series: any[] = [];
+    let lastDate = '';
+    flows.forEach(f => {
+      running += f.delta;
+      lastDate = f.date;
+      series.push({ date: f.date, Balance: Math.round(running * 100) / 100 });
+    });
+    // Ensure last point is on selected balanceDate if different
+    if (lastDate && lastDate !== balanceDate) {
+      series.push({ date: balanceDate, Balance: Math.round(running * 100) / 100 });
+    }
+    return series;
+  };
+  const balanceSeries = getBalanceSeries();
+  const currentBalance = balanceSeries.length ? balanceSeries[balanceSeries.length - 1].Balance : 0;
 
   // Handle form submission for adding new expenses/income
   const handleSubmit = async (e: React.FormEvent) => {
@@ -881,6 +989,51 @@ const ExpenseTrackerPage = () => {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Add Entry Section */}
           <Card className={LAYOUT.standardCard}>
+            {/* Balance header */}
+            <div className="mb-6 p-4 rounded-lg bg-slate-50 border border-border">
+              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                <div>
+                  <div className="text-sm text-muted-foreground">Current Balance</div>
+                  <div className="text-2xl font-bold">₹{Number(currentBalance || 0).toLocaleString()}</div>
+                </div>
+                <div className="flex flex-wrap items-end gap-4">
+                  <div>
+                    <Label htmlFor="balance-date">Balance as of</Label>
+                    <Input id="balance-date" type="date" value={balanceDate} onChange={e => setBalanceDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="starting-date">Starting date</Label>
+                    <Input id="starting-date" type="date" value={startingDate} onChange={e => setStartingDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="starting-balance">Starting amount</Label>
+                    <div className="flex items-center gap-2">
+                      <Input id="starting-balance" type="number" placeholder="0" value={startingBalance} onChange={e => setStartingBalance(e.target.value)} />
+                      <Button type="button" onClick={handleSaveStartingBalance}>Save</Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Balance line chart */}
+              <div className="mt-4">
+                {balanceSeries.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No balance data yet</div>
+                ) : (
+                  <ChartContainer config={{ Balance: { label: 'Balance', color: 'hsl(var(--primary))' } }}>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <LineChart data={balanceSeries} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" tickFormatter={(v) => new Date(v).toLocaleDateString()} fontSize={12} />
+                        <YAxis tickFormatter={(v) => `₹${Number(v).toLocaleString()}`} fontSize={12} width={80} />
+                        <Tooltip content={<ChartTooltipContent />} />
+                        <Line type="monotone" dataKey="Balance" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                )}
+              </div>
+            </div>
             <h3 className={TYPOGRAPHY.sectionHeader}>+ Add {entryType === 'expense' ? 'Expense' : 'Income'}</h3>
             
             <ToggleTabs
