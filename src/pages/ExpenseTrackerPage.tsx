@@ -1006,57 +1006,69 @@ const ExpenseTrackerPage = () => {
           </div>
         )}
 
+        {/* Expense Trends (top full-width tile) */}
+        <Card className={LAYOUT.standardCard}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className={TYPOGRAPHY.sectionHeader}>Expense Trends</h3>
+            <div className="flex items-center gap-2">
+              <Button variant={balanceRange==='month' ? 'default' : 'outline'} size="sm" onClick={() => setBalanceRange('month')}>Monthly</Button>
+              <Button variant={balanceRange==='year' ? 'default' : 'outline'} size="sm" onClick={() => setBalanceRange('year')}>Yearly</Button>
+            </div>
+          </div>
+          <div className="mt-2">
+            {(() => {
+              // Build expense category trend series (by day)
+              const end = new Date(balanceDate);
+              const start = new Date(end);
+              start.setDate(start.getDate() - (balanceRange === 'year' ? 365 : 30));
+              const startStr = start.toISOString().split('T')[0];
+              const endStr = end.toISOString().split('T')[0];
+              const catList = expenseCategories.map(c => c.name);
+              const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (24*60*60*1000)) + 1);
+              const buckets: any[] = [];
+              for (let i=0;i<totalDays;i++) {
+                const d = new Date(start);
+                d.setDate(d.getDate()+i);
+                const date = d.toISOString().split('T')[0];
+                const base: any = { date };
+                catList.forEach(n => base[n] = 0);
+                buckets.push(base);
+              }
+              const idxOf = (date: string) => {
+                const t = new Date(date).getTime();
+                const off = Math.floor((t - start.getTime())/(24*60*60*1000));
+                return off >=0 && off < buckets.length ? off : -1;
+              };
+              expenses.filter(e => e.type === 'expense' && e.date >= startStr && e.date <= endStr).forEach(e => {
+                const k = idxOf(e.date);
+                if (k >= 0) {
+                  const cat = e.category;
+                  if (buckets[k].hasOwnProperty(cat)) buckets[k][cat] += Math.abs(e.amount || 0);
+                }
+              });
+              const config = Object.fromEntries(expenseCategories.map(c => [c.name, { label: c.name, color: c.color || '#3b82f6' }]));
+              return (
+                <ChartContainer config={config as any}>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={buckets} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" tickFormatter={(v) => new Date(v).toLocaleDateString()} fontSize={12} />
+                      <YAxis tickFormatter={(v) => `₹${Number(v).toLocaleString()}`} fontSize={12} width={80} />
+                      <Tooltip content={<ChartTooltipContent />} />
+                      {expenseCategories.map((c, idx) => (
+                        <Line key={c.id} type="monotone" dataKey={c.name} stroke={c.color || 'hsl(var(--primary))'} strokeWidth={2} dot={{ r: 1.5 }} />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              );
+            })()}
+          </div>
+        </Card>
+
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Add Entry Section */}
           <Card className={LAYOUT.standardCard}>
-            {/* Balance header */}
-            <div className="mb-6 p-4 rounded-lg bg-slate-50 border border-border">
-              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-                <div>
-                  <div className="text-sm text-muted-foreground">Current Balance</div>
-                  <div className="text-2xl font-bold">₹{Number(currentBalance || 0).toLocaleString()}</div>
-                </div>
-                <div className="flex flex-wrap items-end gap-4">
-                  <div>
-                    <Label htmlFor="balance-date">Balance as of</Label>
-                    <Input id="balance-date" type="date" value={balanceDate} onChange={e => setBalanceDate(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="block">Range</Label>
-                    <div className="flex items-center gap-2">
-                      <Button variant={balanceRange==='month' ? 'default' : 'outline'} size="sm" onClick={() => setBalanceRange('month')}>Monthly</Button>
-                      <Button variant={balanceRange==='year' ? 'default' : 'outline'} size="sm" onClick={() => setBalanceRange('year')}>Yearly</Button>
-                    </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="starting-balance">Starting amount</Label>
-                    <div className="flex items-center gap-2">
-                      <Input id="starting-balance" type="number" placeholder="0" value={startingBalance} onChange={e => setStartingBalance(e.target.value)} />
-                      <Button type="button" onClick={handleSaveStartingBalance}>Save</Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Balance line chart */}
-              <div className="mt-4">
-                {balanceSeries.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No balance data yet</div>
-                ) : (
-                  <ChartContainer config={{ Balance: { label: 'Balance', color: 'hsl(var(--primary))' } }}>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <LineChart data={balanceSeries} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" tickFormatter={(v) => new Date(v).toLocaleDateString()} fontSize={12} />
-                        <YAxis tickFormatter={(v) => `₹${Number(v).toLocaleString()}`} fontSize={12} width={80} />
-                        <Tooltip content={<ChartTooltipContent />} />
-                        <Line type="monotone" dataKey="Balance" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </ChartContainer>
-                )}
-              </div>
-            </div>
             <h3 className={TYPOGRAPHY.sectionHeader}>+ Add {entryType === 'expense' ? 'Expense' : 'Income'}</h3>
             
             <ToggleTabs
