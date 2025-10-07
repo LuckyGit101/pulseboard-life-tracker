@@ -462,6 +462,16 @@ class ApiClient {
     return response.data!;
   }
 
+  // Balance Series API
+  async getBalanceSeries(params?: { asOf?: string; range?: 'month' | 'year' }): Promise<Array<{ date: string; balance: number }>> {
+    const queryParams = new URLSearchParams();
+    if (params?.asOf) queryParams.append('as_of', params.asOf);
+    if (params?.range) queryParams.append('range', params.range);
+    const endpoint = `/expenses/balance${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const response = await this.request<{ series: Array<{ date: string; balance: number }> }>(endpoint);
+    return response.data?.series || [];
+  }
+
   // Investment Methods
   async getInvestments(): Promise<Investment[]> {
     const response = await this.request<{ items: Investment[]; total: number; page: number; limit: number; hasMore: boolean }>('/investments');
