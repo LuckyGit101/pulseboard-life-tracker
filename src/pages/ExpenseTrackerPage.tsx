@@ -58,6 +58,7 @@ const ExpenseTrackerPage = () => {
 
   // Balance widgets
   const [balanceDate, setBalanceDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [balanceRange, setBalanceRange] = useState<'month' | 'year'>('month');
   const [startingDate, setStartingDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [startingBalance, setStartingBalance] = useState<string>('');
   const [startingEntry, setStartingEntry] = useState<Expense | null>(null);
@@ -812,7 +813,26 @@ const ExpenseTrackerPage = () => {
     }
     return series;
   };
-  const balanceSeries = getBalanceSeries();
+  // Prefer backend series (for consistency), fallback to local if needed
+  const [balanceSeries, setBalanceSeries] = useState<any[]>([]);
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setBalanceSeries(getBalanceSeries());
+      return;
+    }
+    (async () => {
+      try {
+        const serverSeries = await apiClient.getBalanceSeries({ asOf: balanceDate, range: balanceRange });
+        if (serverSeries && serverSeries.length) {
+          setBalanceSeries(serverSeries.map(p => ({ date: p.date, Balance: p.balance })));
+        } else {
+          setBalanceSeries(getBalanceSeries());
+        }
+      } catch {
+        setBalanceSeries(getBalanceSeries());
+      }
+    })();
+  }, [isAuthenticated, balanceDate, balanceRange, expenses, investments, startingBalance, startingDate]);
   const currentBalance = balanceSeries.length ? balanceSeries[balanceSeries.length - 1].Balance : 0;
 
   // Handle form submission for adding new expenses/income
@@ -1002,8 +1022,11 @@ const ExpenseTrackerPage = () => {
                     <Input id="balance-date" type="date" value={balanceDate} onChange={e => setBalanceDate(e.target.value)} />
                   </div>
                   <div>
-                    <Label htmlFor="starting-date">Starting date</Label>
-                    <Input id="starting-date" type="date" value={startingDate} onChange={e => setStartingDate(e.target.value)} />
+                    <Label className="block">Range</Label>
+                    <div className="flex items-center gap-2">
+                      <Button variant={balanceRange==='month' ? 'default' : 'outline'} size="sm" onClick={() => setBalanceRange('month')}>Monthly</Button>
+                      <Button variant={balanceRange==='year' ? 'default' : 'outline'} size="sm" onClick={() => setBalanceRange('year')}>Yearly</Button>
+                    </div>
                   </div>
                   <div>
                     <Label htmlFor="starting-balance">Starting amount</Label>
@@ -1046,7 +1069,8 @@ const ExpenseTrackerPage = () => {
             />
 
             <form onSubmit={handleSubmit} className="space-y-4 mt-6">
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
                 <Input
                   id="name"
@@ -1055,9 +1079,8 @@ const ExpenseTrackerPage = () => {
                   placeholder={entryType === 'expense' ? 'e.g., Groceries' : 'e.g., Salary'}
                   required
                 />
-              </div>
-
-              <div className="space-y-2">
+                </div>
+                <div className="space-y-2">
                 <Label htmlFor="amount">Amount</Label>
                 <Input
                   id="amount"
@@ -1069,9 +1092,8 @@ const ExpenseTrackerPage = () => {
                   min="0.01"
                   required
                 />
-              </div>
-
-              <div className="space-y-2">
+                </div>
+                <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <Select
                   value={formData.category}
@@ -1098,9 +1120,8 @@ const ExpenseTrackerPage = () => {
                     }
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-2">
+                </div>
+                <div className="space-y-2">
                 <Label htmlFor="date">Date</Label>
                 <Input
                   id="date"
@@ -1109,6 +1130,7 @@ const ExpenseTrackerPage = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
                   required
                 />
+                </div>
               </div>
 
               {entryType === 'expense' && (
