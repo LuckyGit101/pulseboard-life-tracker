@@ -64,7 +64,7 @@ const TaskCalendarPage = () => {
   const { isAuthenticated } = useAuth();
   const [calendarView, setCalendarView] = useState<'monthly' | 'weekly'>('monthly');
   const [taskView, setTaskView] = useState<'daily' | 'weekly' | 'tasks'>('daily');
-  const [selectedDate, setSelectedDate] = useState(new Date(2025, 8, 1)); // September 1, 2025 (where the current tasks are)
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [tasks, setTasks] = useState<typeof emptyTasks>([]); // Start empty, load based on auth status
   const [loading, setLoading] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
