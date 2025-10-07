@@ -597,14 +597,24 @@ class ApiClient {
 
 
   // User Data Deletion
-  async deleteUserData(params: { mode: 'range' | 'all_keep_profile'; dateFrom?: string; dateTo?: string }): Promise<ApiResponse<{ totalDeleted: number; summary: any }>> {
+  async deleteUserData(params: {
+    mode: 'range' | 'all_keep_profile';
+    dateFrom?: string;
+    dateTo?: string;
+    targets?: Array<'tasks' | 'expenses' | 'investments'>;
+    includeLongTerm?: boolean;
+    dryRun?: boolean;
+  }): Promise<ApiResponse<{ totalDeleted: number; summary: any; matched?: any; sample?: any }>> {
     const queryParams = new URLSearchParams();
     queryParams.append('mode', params.mode);
     if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
     if (params.dateTo) queryParams.append('dateTo', params.dateTo);
+    if (params.targets && params.targets.length > 0) queryParams.append('targets', params.targets.join(','));
+    if (typeof params.includeLongTerm === 'boolean') queryParams.append('includeLongTerm', String(params.includeLongTerm));
+    if (typeof params.dryRun === 'boolean') queryParams.append('dry_run', String(params.dryRun));
 
     const endpoint = `/user/data${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    const response = await this.request<{ totalDeleted: number; summary: any }>(endpoint, {
+    const response = await this.request<{ totalDeleted: number; summary: any; matched?: any; sample?: any }>(endpoint, {
       method: 'DELETE',
     });
     return response;
@@ -621,6 +631,30 @@ class ApiClient {
     const response = await this.request('/tasks/import-batch', {
       method: 'POST',
       body: JSON.stringify({ rows, dryRun })
+    });
+    return response.data!;
+  }
+
+  async bulkImportExpenses(csvData: string): Promise<{
+    success: number;
+    failed: number;
+    errors: string[];
+  }> {
+    const response = await this.request('/bulk-import-expenses', {
+      method: 'POST',
+      body: JSON.stringify({ csvData })
+    });
+    return response.data!;
+  }
+
+  async bulkImportIncome(csvData: string): Promise<{
+    success: number;
+    failed: number;
+    errors: string[];
+  }> {
+    const response = await this.request('/bulk-import-income', {
+      method: 'POST',
+      body: JSON.stringify({ csvData })
     });
     return response.data!;
   }

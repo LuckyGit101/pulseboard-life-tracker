@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { User, Mail, Calendar, Settings, Globe, Download, Shield, LogOut, ArrowRight, Bell, Moon, Trash, Upload } from 'lucide-react';
@@ -26,6 +27,11 @@ const ProfilePage = () => {
   const [deleteMode, setDeleteMode] = useState<'range' | 'all_keep_profile'>('range');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [targetTasks, setTargetTasks] = useState(true);
+  const [targetExpenses, setTargetExpenses] = useState(true);
+  const [targetInvestments, setTargetInvestments] = useState(false);
+  const [includeLongTerm, setIncludeLongTerm] = useState(false);
+  const [dryRun, setDryRun] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [deleteResult, setDeleteResult] = useState<string | null>(null);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
@@ -531,14 +537,45 @@ const ProfilePage = () => {
                 </div>
 
                 {deleteMode === 'range' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>From</Label>
-                      <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>From</Label>
+                        <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>To</Label>
+                        <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                      </div>
                     </div>
+
                     <div className="space-y-2">
-                      <Label>To</Label>
-                      <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                      <Label>Targets</Label>
+                      <div className="flex flex-wrap gap-5">
+                        <label className="flex items-center gap-2">
+                          <Checkbox checked={targetTasks} onCheckedChange={(v) => setTargetTasks(!!v)} />
+                          <span>Tasks</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <Checkbox checked={targetExpenses} onCheckedChange={(v) => setTargetExpenses(!!v)} />
+                          <span>Expenses</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <Checkbox checked={targetInvestments} onCheckedChange={(v) => setTargetInvestments(!!v)} />
+                          <span>Investments</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="dry-run" className="flex items-center gap-3 cursor-pointer">
+                        <Switch id="dry-run" checked={dryRun} onCheckedChange={(v) => setDryRun(!!v)} />
+                        <span>Dry run (preview only)</span>
+                      </label>
+                      <label htmlFor="include-long-term" className="flex items-center gap-3 cursor-pointer">
+                        <Switch id="include-long-term" checked={includeLongTerm} onCheckedChange={(v) => setIncludeLongTerm(!!v)} />
+                        <span>Include long-term tasks</span>
+                      </label>
                     </div>
                   </div>
                 )}
@@ -553,13 +590,46 @@ const ProfilePage = () => {
                   <Button variant="outline" onClick={() => { setShowDeleteData(false); setDeleteResult(null); }}>Cancel</Button>
                   <Button
                     variant="destructive"
-                    disabled={deleting || (deleteMode === 'range' && !dateFrom && !dateTo)}
+                    disabled={deleting || (deleteMode === 'range' && !dateFrom && !dateTo) || (deleteMode === 'range' && !targetTasks && !targetExpenses && !targetInvestments)}
                     onClick={async () => {
                       try {
                         setDeleting(true);
                         setDeleteResult(null);
-                        const res = await apiClient.deleteUserData({ mode: deleteMode, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined });
-                        setDeleteResult(`Deleted ${res.data?.totalDeleted ?? 0} items`);
+                        const targets: Array<'tasks' | 'expenses' | 'investments'> = [];
+                        if (targetTasks) targets.push('tasks');
+                        if (targetExpenses) targets.push('expenses');
+                        if (targetInvestments) targets.push('investments');
+                        const res = await apiClient.deleteUserData({ 
+                          mode: deleteMode, 
+                          dateFrom: dateFrom || undefined, 
+                          dateTo: dateTo || undefined,
+                          targets,
+                          includeLongTerm,
+                          dryRun,
+                        });
+                        if (res.data?.dryRun) {
+                          const matched = res.data?.matched || {};
+                          const tasks = matched.tasks ?? 0;
+                          const expenses = matched.expenses ?? 0;
+                          const investments = matched.investments ?? 0;
+                          const totalPreview = tasks + expenses + investments;
+                          const sample = res.data?.sample || {} as any;
+                          const sampleLines: string[] = [];
+                          const addSamples = (title: string, arr?: any[]) => {
+                            if (!arr || arr.length === 0) return;
+                            const items = arr.slice(0, 3).map((x: any) => `${x.name || x.id || 'item'} (${x.date || ''})`).join('; ');
+                            sampleLines.push(`${title}: ${items}`);
+                          };
+                          addSamples('Tasks', sample.tasks);
+                          addSamples('Expenses', sample.expenses);
+                          addSamples('Investments', sample.investments);
+                          const sampleText = sampleLines.length ? `\nPreview items → ${sampleLines.join(' | ')}` : '';
+                          setDeleteResult(`Preview: Tasks: ${tasks}, Expenses: ${expenses}, Investments: ${investments}. Total ${totalPreview}.${sampleText}`);
+                        } else {
+                          const total = res.data?.totalDeleted ?? 0;
+                          const summary = res.data?.summary || {};
+                          setDeleteResult(`Tasks: ${summary.tasksDeleted ?? 0}, Expenses: ${summary.expensesDeleted ?? 0}, Investments: ${summary.investmentsDeleted ?? 0}. Total ${total}.`);
+                        }
                       } catch (err: any) {
                         setDeleteResult(err.message || 'Failed to delete data');
                       } finally {
@@ -567,7 +637,7 @@ const ProfilePage = () => {
                       }
                     }}
                   >
-                    {deleting ? 'Deleting…' : 'Confirm Delete'}
+                    {deleting ? 'Processing…' : (dryRun ? 'Preview' : 'Confirm Delete')}
                   </Button>
                 </div>
               </div>
