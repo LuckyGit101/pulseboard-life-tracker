@@ -1008,16 +1008,36 @@ const ExpenseTrackerPage = () => {
 
         {/* Expense Trends (top full-width tile) */}
         <Card className={LAYOUT.standardCard}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={TYPOGRAPHY.sectionHeader}>Expense Trends</h3>
-            <div className="flex items-center gap-2">
-              <Button variant={balanceRange==='month' ? 'default' : 'outline'} size="sm" onClick={() => setBalanceRange('month')}>Monthly</Button>
-              <Button variant={balanceRange==='year' ? 'default' : 'outline'} size="sm" onClick={() => setBalanceRange('year')}>Yearly</Button>
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
+            <div>
+              <h3 className={TYPOGRAPHY.sectionHeader}>Expense Trends</h3>
+              <div className="text-sm text-muted-foreground mt-1">Current Balance</div>
+              <div className="text-xl font-bold">₹{Number(currentBalance || 0).toLocaleString()}</div>
+            </div>
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <Label htmlFor="trend-balance-date">As of</Label>
+                <Input id="trend-balance-date" type="date" value={balanceDate} onChange={e => setBalanceDate(e.target.value)} />
+              </div>
+              <div>
+                <Label className="block">Range</Label>
+                <div className="flex items-center gap-2">
+                  <Button variant={balanceRange==='month' ? 'default' : 'outline'} size="sm" onClick={() => setBalanceRange('month')}>Monthly</Button>
+                  <Button variant={balanceRange==='year' ? 'default' : 'outline'} size="sm" onClick={() => setBalanceRange('year')}>Yearly</Button>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="starting-balance-top">Starting amount</Label>
+                <div className="flex items-center gap-2">
+                  <Input id="starting-balance-top" type="number" placeholder="0" value={startingBalance} onChange={e => setStartingBalance(e.target.value)} />
+                  <Button type="button" onClick={handleSaveStartingBalance}>Save</Button>
+                </div>
+              </div>
             </div>
           </div>
           <div className="mt-2">
             {(() => {
-              // Build expense category trend series (by day)
+              // Build expense category trend series (lifetime cumulative by category)
               const end = new Date(balanceDate);
               const start = new Date(end);
               start.setDate(start.getDate() - (balanceRange === 'year' ? 365 : 30));
@@ -1039,18 +1059,30 @@ const ExpenseTrackerPage = () => {
                 const off = Math.floor((t - start.getTime())/(24*60*60*1000));
                 return off >=0 && off < buckets.length ? off : -1;
               };
+              // Baseline before window for lifetime cumulative per category
+              const baseline: Record<string, number> = Object.fromEntries(catList.map(n => [n, 0])) as any;
+              expenses.filter(e => e.type === 'expense' && e.date < startStr).forEach(e => {
+                if (baseline.hasOwnProperty(e.category)) baseline[e.category] += Math.abs(e.amount || 0);
+              });
+              // Daily increments within window
+              const daily: Record<string, Record<string, number>> = {};
+              buckets.forEach(b => { daily[b.date] = Object.fromEntries(catList.map(n => [n, 0])) as any; });
               expenses.filter(e => e.type === 'expense' && e.date >= startStr && e.date <= endStr).forEach(e => {
-                const k = idxOf(e.date);
-                if (k >= 0) {
-                  const cat = e.category;
-                  if (buckets[k].hasOwnProperty(cat)) buckets[k][cat] += Math.abs(e.amount || 0);
-                }
+                if (daily[e.date] && daily[e.date].hasOwnProperty(e.category)) daily[e.date][e.category] += Math.abs(e.amount || 0);
+              });
+              // Build cumulative: start from baseline
+              let running: Record<string, number> = { ...baseline } as any;
+              const series = buckets.map(b => {
+                const date = b.date;
+                const out: any = { date };
+                catList.forEach(n => { running[n] += (daily[date]?.[n] || 0); out[n] = running[n]; });
+                return out;
               });
               const config = Object.fromEntries(expenseCategories.map(c => [c.name, { label: c.name, color: c.color || '#3b82f6' }]));
               return (
                 <ChartContainer config={config as any}>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={buckets} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
+                  <ResponsiveContainer width="100%" height={140}>
+                    <LineChart data={series} margin={{ top: 10, right: 20, bottom: 0, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="date" tickFormatter={(v) => new Date(v).toLocaleDateString()} fontSize={12} />
                       <YAxis tickFormatter={(v) => `₹${Number(v).toLocaleString()}`} fontSize={12} width={80} />
