@@ -1011,7 +1011,7 @@ const ExpenseTrackerPage = () => {
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-2">
             <div>
               <h3 className={TYPOGRAPHY.sectionHeader}>Expense Trends</h3>
-              <div className="text-sm text-muted-foreground mt-1">Current Balance</div>
+              <div className="text-sm text-muted-foreground mt-1">Current Balance (as of date)</div>
               <div className="text-xl font-bold">₹{Number(currentBalance || 0).toLocaleString()}</div>
             </div>
             <div className="flex flex-wrap items-end gap-4">
@@ -1113,8 +1113,7 @@ const ExpenseTrackerPage = () => {
             />
 
             <form onSubmit={handleSubmit} className="space-y-4 mt-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
+              <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
                 <Input
                   id="name"
@@ -1123,8 +1122,9 @@ const ExpenseTrackerPage = () => {
                   placeholder={entryType === 'expense' ? 'e.g., Groceries' : 'e.g., Salary'}
                   required
                 />
-                </div>
-                <div className="space-y-2">
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="amount">Amount</Label>
                 <Input
                   id="amount"
@@ -1136,8 +1136,9 @@ const ExpenseTrackerPage = () => {
                   min="0.01"
                   required
                 />
-                </div>
-                <div className="space-y-2">
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <Select
                   value={formData.category}
@@ -1164,8 +1165,9 @@ const ExpenseTrackerPage = () => {
                     }
                   </SelectContent>
                 </Select>
-                </div>
-                <div className="space-y-2">
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="date">Date</Label>
                 <Input
                   id="date"
@@ -1174,7 +1176,6 @@ const ExpenseTrackerPage = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
                   required
                 />
-                </div>
               </div>
 
               {entryType === 'expense' && (
