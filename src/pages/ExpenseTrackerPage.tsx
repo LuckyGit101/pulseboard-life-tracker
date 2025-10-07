@@ -695,6 +695,18 @@ const ExpenseTrackerPage = () => {
 
   const hasActiveFilters = filters.category !== 'all' || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax;
 
+  // Sort by date desc, then by amount magnitude desc, and limit to first 30 for display
+  const displayedData = [...filteredData]
+    .sort((a, b) => {
+      const dA = new Date(a.date).getTime();
+      const dB = new Date(b.date).getTime();
+      if (dB !== dA) return dB - dA; // newer first
+      const mA = Math.abs(Number(a.amount) || 0);
+      const mB = Math.abs(Number(b.amount) || 0);
+      return mB - mA; // higher magnitude first
+    })
+    .slice(0, 30);
+
   // Handle form submission for adding new expenses/income
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1324,7 +1336,7 @@ const ExpenseTrackerPage = () => {
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="text-xs">
-                    {filteredData.length} of {dataArray.length} entries
+                    Showing {displayedData.length} of {filteredData.length}
                   </Badge>
                   {hasActiveFilters && (
                     <Badge variant="outline" className="text-xs">
@@ -1346,8 +1358,8 @@ const ExpenseTrackerPage = () => {
             </div>
 
             <div className="space-y-3">
-              {filteredData.length > 0 ? (
-                filteredData.map((entry) => (
+              {displayedData.length > 0 ? (
+                displayedData.map((entry) => (
                   <div
                     key={entry.id}
                     className="flex items-center justify-between p-4 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors"
